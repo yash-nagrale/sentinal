@@ -1,0 +1,41 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Python virtual environments
+venv/
+.env
+.venv/
+env/
+
+# Editor directories
+.vscode/
+.idea/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Data artifacts (generated or intermediate)
+data/processed/
+
+# Model weights and checkpoints
+models/
+*.pt
+
+# Output files from predictions/evaluation
+outputs/
+*.csv
+
+# Misc
+*.log
+*.tmp
+*.bak
+
+# OS files
+.DS_Store
+Thumbs.db
