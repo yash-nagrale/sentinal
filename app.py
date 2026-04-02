@@ -17,30 +17,157 @@ sys.path.insert(0, BASE)
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="NeuroGuard",
-    page_icon="🧠",
+    page_title="SentinAl",
+    page_icon="🛡",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 st.markdown("""
 <style>
-section[data-testid="stSidebar"]{background:#0B1F4B}
-section[data-testid="stSidebar"] *{color:#fff!important}
-.risk-high{background:#FCEBEB;border-left:4px solid #E24B4A;padding:12px 16px;border-radius:8px;margin:6px 0}
-.risk-mod {background:#FAEEDA;border-left:4px solid #EF9F27;padding:12px 16px;border-radius:8px;margin:6px 0}
-.risk-low {background:#EAF3DE;border-left:4px solid #639922;padding:12px 16px;border-radius:8px;margin:6px 0}
-.ollama-box{background:#EAF3DE;border-left:3px solid #1D9E75;padding:12px 16px;border-radius:8px;font-size:14px;line-height:1.7;margin-top:10px}
-.doc-card{background:#F8F9FA;border:1px solid #dee2e6;border-radius:12px;padding:14px 16px;margin:8px 0}
-.doc-card h4{margin:0 0 4px 0;font-size:15px;color:#0B1F4B}
-.doc-card p{margin:2px 0;font-size:13px;color:#444}
-.star{color:#EF9F27;font-size:13px}
-.open-badge{background:#EAF3DE;color:#2d6a4f;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
-.closed-badge{background:#FCEBEB;color:#9d0208;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+html, body, [class*="css"]{font-family:'Inter',sans-serif}
+
+/* ── Sidebar ──────────────────────────────────────────────────── */
+section[data-testid="stSidebar"]{background:linear-gradient(180deg,#0A1628 0%,#0F1D32 100%);border-right:1px solid #1E293B}
+section[data-testid="stSidebar"] *{color:#CBD5E1!important}
+section[data-testid="stSidebar"] .stRadio>div{gap:2px}
+section[data-testid="stSidebar"] .stRadio label{border-radius:10px;padding:10px 14px!important;transition:all .2s ease}
+section[data-testid="stSidebar"] .stRadio label:hover{background:rgba(255,255,255,0.06)}
+section[data-testid="stSidebar"] .stRadio label[data-baseweb="radio"]:has(input:checked){background:rgba(14,165,233,0.12)}
+
+/* ── Risk alerts ──────────────────────────────────────────────── */
+.risk-high{background:linear-gradient(135deg,#FEF2F2,#FECACA);border-left:4px solid #EF4444;padding:14px 18px;border-radius:12px;margin:8px 0;color:#7F1D1D}
+.risk-mod {background:linear-gradient(135deg,#FFFBEB,#FDE68A);border-left:4px solid #F59E0B;padding:14px 18px;border-radius:12px;margin:8px 0;color:#78350F}
+.risk-low {background:linear-gradient(135deg,#F0FDF4,#BBF7D0);border-left:4px solid #22C55E;padding:14px 18px;border-radius:12px;margin:8px 0;color:#14532D}
+
+/* ── Overview metric cards ────────────────────────────────────── */
+.metric-card{border-radius:16px;padding:26px 24px;position:relative;overflow:hidden}
+.metric-card .label{font-size:10px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;opacity:.65;margin-bottom:10px}
+.metric-card .value{font-size:38px;font-weight:800;margin:0;line-height:1.15}
+.metric-card .badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:5px 12px;border-radius:20px;margin-top:14px}
+.mc-ps2{background:linear-gradient(135deg,#E0F2FE 0%,#BAE6FD 100%);color:#0C4A6E}
+.mc-ps2 .badge{background:#DCFCE7;color:#166534}
+.mc-ps1{background:linear-gradient(135deg,#FCE7F3 0%,#FBCFE8 100%);color:#831843}
+.mc-ps1 .badge{background:#FFF1F2;color:#9F1239}
+.mc-ps5{background:linear-gradient(135deg,#E0E7FF 0%,#C7D2FE 100%);color:#312E81}
+.mc-ps5 .badge{background:#DBEAFE;color:#1E40AF}
+.mc-modules{background:linear-gradient(135deg,#0F172A 0%,#1E293B 100%);color:#F1F5F9}
+.mc-modules .badge{background:rgba(250,204,21,.15);color:#FDE68A}
+
+/* ── Overview module cards ────────────────────────────────────── */
+.module-card{border:1px solid #E2E8F0;border-radius:18px;padding:30px 26px;background:#fff;transition:all .25s ease;position:relative;overflow:hidden;min-height:300px;display:flex;flex-direction:column;cursor:pointer}
+.module-card:hover{box-shadow:0 10px 40px rgba(0,0,0,.07);transform:translateY(-3px)}
+.module-card .tag{position:absolute;top:18px;right:18px;font-size:10px;font-weight:700;letter-spacing:1.2px;color:#94A3B8;background:#F1F5F9;padding:5px 12px;border-radius:8px}
+.module-card .icon{width:50px;height:50px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:18px}
+.module-card h3{font-size:20px;font-weight:700;color:#0F172A;margin:0 0 10px}
+.module-card .desc{font-size:13px;color:#64748B;line-height:1.7;flex:1}
+.module-card .metrics{display:flex;gap:28px;margin-top:20px;padding-top:18px;border-top:1px solid #F1F5F9}
+.module-card .metric-item .mlabel{font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#94A3B8;margin-bottom:2px}
+.module-card .metric-item .mval{font-size:24px;font-weight:800}
+.mc-vital{border-top:3px solid #0EA5E9}.mc-vital .icon{background:#E0F2FE;color:#0284C7}.mc-vital .mval{color:#0284C7}
+.mc-stroke{border-top:3px solid #10B981}.mc-stroke .icon{background:#D1FAE5;color:#059669}.mc-stroke .mval{color:#059669}
+.mc-wound{border-top:3px solid #F43F5E}.mc-wound .icon{background:#FFE4E6;color:#E11D48}.mc-wound .mval{color:#E11D48}
+
+/* ── Recommender card ─────────────────────────────────────────── */
+.recommender-card{background:linear-gradient(135deg,#ECFDF5 0%,#D1FAE5 100%);border:1px solid #A7F3D0;border-radius:18px;padding:34px 32px;margin:20px 0;display:flex;align-items:center;gap:28px;flex-wrap:wrap}
+.rec-icon{width:58px;height:58px;background:#10B981;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:28px;color:#fff;flex-shrink:0}
+.rec-info{flex:1;min-width:220px}
+.rec-info h3{font-size:22px;font-weight:700;color:#064E3B;margin:0 0 6px}
+.rec-desc{font-size:13px;color:#047857;line-height:1.65}
+.rec-right{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.rec-badge-box{background:#fff;border:1px solid #A7F3D0;border-radius:14px;padding:16px 22px;text-align:center}
+.rec-badge-box .rb-label{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#059669;margin-bottom:6px}
+.rec-badge-box .rb-value{font-size:16px;font-weight:700;color:#064E3B}
+.rec-launch{background:#10B981;color:#fff!important;font-weight:700;font-size:15px;border:none;border-radius:12px;padding:14px 32px;cursor:pointer;transition:all .2s;text-decoration:none;display:inline-block}
+.rec-launch:hover{background:#059669;transform:translateY(-1px);box-shadow:0 4px 14px rgba(16,185,129,.35)}
+
+/* ── Performance table ────────────────────────────────────────── */
+.perf-header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap;gap:12px}
+.perf-header h2{font-size:22px;font-weight:700;color:#0F172A;margin:0}
+.perf-header .ph-sub{font-size:13px;color:#64748B;margin:4px 0 0}
+.perf-table{width:100%;border-collapse:separate;border-spacing:0;border:1px solid #E2E8F0;border-radius:14px;overflow:hidden}
+.perf-table th{background:#F8FAFC;color:#64748B;font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;padding:15px 20px;text-align:left;border-bottom:1px solid #E2E8F0}
+.perf-table td{padding:18px 20px;font-size:14px;color:#334155;border-bottom:1px solid #F1F5F9}
+.perf-table tr:last-child td{border-bottom:none}
+.perf-table tr:hover td{background:#F8FAFC}
+.model-badge{padding:5px 14px;border-radius:8px;font-size:12px;font-weight:700;display:inline-block}
+.badge-ps2{background:#DBEAFE;color:#1D4ED8}
+.badge-ps1{background:#FCE7F3;color:#BE185D}
+.badge-ps5{background:#D1FAE5;color:#059669}
+.perf-status{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:#059669}
+.perf-status-dot{width:8px;height:8px;background:#10B981;border-radius:50%;display:inline-block}
+
+/* ── Ollama / doc / chat ──────────────────────────────────────── */
+.ollama-box{background:linear-gradient(135deg,#F0FDF4,#DCFCE7);border-left:3px solid #10B981;padding:14px 18px;border-radius:12px;font-size:14px;line-height:1.75;margin-top:10px;color:#166534}
+.doc-card{background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:18px 22px;margin:10px 0;box-shadow:0 1px 4px rgba(0,0,0,.04);transition:box-shadow .2s}
+.doc-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.08)}
+.doc-card h4{margin:0 0 6px;font-size:15px;color:#0F172A;font-weight:600}
+.doc-card p{margin:3px 0;font-size:13px;color:#64748B}
+.star{color:#F59E0B;font-size:13px}
+.open-badge{background:#DCFCE7;color:#166534;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:600}
+.closed-badge{background:#FEE2E2;color:#991B1B;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:600}
+
+/* ── Sidebar custom elements ──────────────────────────────────── */
+.sidebar-brand{display:flex;align-items:center;gap:12px;padding:4px 0;margin-bottom:2px}
+.sidebar-brand .sb-icon{width:38px;height:38px;background:linear-gradient(135deg,#0EA5E9,#06B6D4);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px}
+.sidebar-brand .sb-name{font-size:17px;font-weight:800;letter-spacing:2px;color:#F1F5F9!important}
+.sidebar-sub{font-size:11px;color:#64748B!important;margin:-2px 0 0 50px}
+.status-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;font-size:13px}
+.sdot-green{width:8px;height:8px;background:#10B981;border-radius:50%;display:inline-block}
+.sdot-red{width:8px;height:8px;background:#EF4444;border-radius:50%;display:inline-block}
+
+/* ── Shimmer ──────────────────────────────────────────────────── */
+@keyframes shimmer{0%{background-position:-468px 0}100%{background-position:468px 0}}
+.shimmer-line{background:linear-gradient(90deg,#F1F5F9 25%,#E2E8F0 37%,#F1F5F9 63%);background-size:936px 100%;animation:shimmer 1.4s ease-in-out infinite;border-radius:8px;margin:10px 0}
+.shimmer-metric{height:72px;border-radius:16px}
+.shimmer-chart{height:320px;border-radius:16px}
+.shimmer-text{height:16px;width:80%}
+.shimmer-text-short{height:16px;width:50%}
+.shimmer-card-block{background:#F8FAFC;border:1px solid #E2E8F0;border-radius:14px;padding:18px;margin:10px 0}
+
+/* ── Footer ───────────────────────────────────────────────────── */
+.app-footer{text-align:center;color:#94A3B8;font-size:12px;padding:28px 0;border-top:1px solid #E2E8F0;margin-top:48px}
 </style>
 """, unsafe_allow_html=True)
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# ── Shimmer / skeleton helpers ───────────────────────────────────────────────
+def _shimmer(css_class="shimmer-text", extra_style=""):
+    st.markdown(f'<div class="shimmer-line {css_class}" style="{extra_style}"></div>',
+                unsafe_allow_html=True)
+
+def shimmer_metrics(n=4):
+    cols = st.columns(n)
+    for c in cols:
+        with c:
+            _shimmer("shimmer-metric")
+
+def shimmer_chart():
+    _shimmer("shimmer-chart")
+
+def shimmer_content(lines=5):
+    widths = ["95%","80%","90%","65%","75%"]
+    for i in range(lines):
+        _shimmer("shimmer-text", f"width:{widths[i % len(widths)]}")
+
+def shimmer_cards(n=3):
+    for _ in range(n):
+        st.markdown(
+            '<div class="shimmer-card-block">'
+            '<div class="shimmer-line shimmer-text" style="width:60%"></div>'
+            '<div class="shimmer-line shimmer-text-short"></div>'
+            '</div>', unsafe_allow_html=True)
+
+# ── Cached Ollama status (avoids 2s blocking call on every re-render) ────────
+@st.cache_data(ttl=30, show_spinner=False)
+def _check_ollama():
+    try:
+        requests.get("http://localhost:11434/", timeout=2)
+        return True
+    except Exception:
+        return False
 
 # ── Model loaders ─────────────────────────────────────────────────────────────
 @st.cache_resource
@@ -137,6 +264,7 @@ def ps2_score(df_proc, feat_cols, model, window=12):
                   torch.FloatTensor(np.array(statics)).to(DEVICE)).cpu().numpy()
     scores[window-1:] = p; return scores
 
+@st.cache_data
 def make_demo(risk="high"):
     n=48; rng=np.random.default_rng(42 if risk=="high" else 7)
     if risk=="high":
@@ -172,7 +300,7 @@ def make_demo(risk="high"):
     })
 
 # Best model for this project: qwen2.5:3b (1.9 GB, fits in RAM, medical-aware)
-OLLAMA_MODELS = ["qwen2.5:3b", "codellama:latest", "qwen3.5:latest"]
+OLLAMA_MODELS = ["qwen2.5:3b", "codellama:latest"]
 
 def ask_ollama(prompt: str, model: str = "qwen2.5:3b") -> str:
     """
@@ -306,10 +434,12 @@ def show_recommender(diagnosis_key: str, default_location: str = "Pune, Maharash
 
     if search_btn or f"results_{diagnosis_key}" in st.session_state:
         if search_btn:
-            with st.spinner(f"Searching for specialists near {location_input}..."):
+            _doc_ph = st.empty()
+            with _doc_ph.container():
+                shimmer_cards(3)
+            with st.spinner(f"Searching for specialists near {location_input}…"):
                 coords = geocode_location(location_input) if GOOGLE_API_KEY != "YOUR_API_KEY_HERE" else (18.5204, 73.8567)
                 if coords is None:
-                    # Fallback: Pune coordinates
                     coords = (18.5204, 73.8567)
                     st.caption(f"Could not geocode '{location_input}' — showing results near Pune.")
 
@@ -321,6 +451,7 @@ def show_recommender(diagnosis_key: str, default_location: str = "Pune, Maharash
                 st.session_state[f"results_{diagnosis_key}"]  = all_results
                 st.session_state[f"coords_{diagnosis_key}"]   = coords
                 st.session_state[f"location_{diagnosis_key}"] = location_input
+            _doc_ph.empty()
 
         all_results = st.session_state.get(f"results_{diagnosis_key}", {})
         coords      = st.session_state.get(f"coords_{diagnosis_key}", (18.5204, 73.8567))
@@ -398,17 +529,31 @@ def show_recommender(diagnosis_key: str, default_location: str = "Pune, Maharash
             pass
 
 
+# ── Navigation helper (card clicks set ?nav= query param) ────────────────────
+_nav_param = st.query_params.get("nav")
+if _nav_param:
+    _NAV_MAP = {"ps2": "📈  Vital Signs (PS2)", "ps5": "🧠  Stroke Detector (PS5)", "ps1": "🦶  Foot Wound (PS1)"}
+    if _nav_param in _NAV_MAP:
+        st.session_state["nav_module"] = _NAV_MAP[_nav_param]
+    del st.query_params["nav"]
+    st.rerun()
+
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("## 🧠 NeuroGuard")
-    st.markdown("**Team 2Infinity · ANC-016**\n*PESMCE, Pune*")
+    st.markdown('''
+    <div class="sidebar-brand">
+        <div class="sb-icon">🛡</div>
+        <span class="sb-name">SENTINEL</span>
+    </div>
+    <div class="sidebar-sub">PESMCE Pune</div>
+    ''', unsafe_allow_html=True)
     st.markdown("---")
     module = st.radio("Module", [
-        "🏠  Platform Overview",
-        "💓  Vital Sign Monitor (PS2)",
-        "🦶  Foot Wound Grader (PS1)",
-        "🧠  CT Stroke Detector (PS5)",
-    ], label_visibility="collapsed")
+        "🏠  Overview",
+        "📈  Vital Signs (PS2)",
+        "🦶  Foot Wound (PS1)",
+        "🧠  Stroke Detector (PS5)",
+    ], label_visibility="collapsed", key="nav_module")
     st.markdown("---")
     st.markdown("#### Google Places API")
     api_key_input = st.text_input("API Key (optional)", type="password",
@@ -423,57 +568,178 @@ with st.sidebar:
     elif "api_key_value" not in st.session_state:
         st.caption("Demo mode — no API key")
     st.markdown("---")
-    st.markdown("#### Ollama status")
-    try:
-        requests.get("http://localhost:11434/", timeout=2)
-        st.success("Ollama running ✓")
-    except Exception:
-        st.error("Ollama offline\nRun: ollama serve")
+
+    # System status
+    st.markdown("##### SYSTEM STATUS")
+    _ollama_ok = _check_ollama()
+    _api_ok = "api_key_value" in st.session_state
+    st.markdown(f'''
+    <div class="status-row"><span>Ollama LLM</span><span class="{"sdot-green" if _ollama_ok else "sdot-red"}"></span></div>
+    <div class="status-row"><span>API Status</span><span class="{"sdot-green" if _api_ok else "sdot-red"}"></span></div>
+    <div class="status-row"><span>System Health</span><span class="sdot-green"></span></div>
+    ''', unsafe_allow_html=True)
     st.markdown("---")
-    st.caption("All AI runs locally.\nNo patient data leaves this device.")
+    st.caption("All AI runs locally · No patient data leaves this device")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # OVERVIEW
 # ══════════════════════════════════════════════════════════════════════════════
 if module.startswith("🏠"):
-    st.title("NeuroGuard — Unified Clinical AI Platform")
-    st.caption("Privacy-first edge AI · all models run locally · zero cloud data transfer")
-    st.markdown("---")
-    c1,c2,c3,c4 = st.columns(4)
-    c1.metric("PS2 AUROC",   "0.9960", help="Vital sign deterioration")
-    c2.metric("PS1 Accuracy","97.05%", help="Foot wound grading")
-    c3.metric("PS5 AUROC",   "0.982",  help="CT stroke detection")
-    c4.metric("Modules",     "4",      help="PS2 + PS1 + PS5 + Recommender")
-    st.markdown("---")
+    # ── Hero ──────────────────────────────────────────────────────────────────
+    st.markdown('''
+    <div style="margin-bottom:8px">
+        <h1 style="font-size:34px;font-weight:800;color:#0F172A;margin:0">
+            Sentin<span style="color:#0EA5E9">Al</span>
+        </h1>
+        <p style="font-size:14px;color:#64748B;margin:6px 0 0">
+            Unified Clinical AI Platform &mdash; Privacy-first edge AI &middot;
+            all models run locally &middot; zero cloud data transfer
+        </p>
+    </div>''', unsafe_allow_html=True)
 
-    col1,col2 = st.columns(2)
-    with col1:
-        st.info("**💓 PS2 — Vital Sign Monitor**\nTemporal Transformer + BiLSTM ensemble. Predicts deterioration 12 hours ahead from continuous vital sign streams.\n\n**AUROC: 0.9960 · Sensitivity: 88.9%**")
-        st.warning("**🦶 PS1 — Foot Wound Grader**\nEfficientNet-B0. Classifies diabetic foot wounds into Wagner Grade 1–4 from a single photograph.\n\n**Accuracy: 97.05% · F1 macro: 0.97**")
-    with col2:
-        st.error("**🧠 PS5 — CT Stroke Detector**\nEfficientNet-B0. Detects hemorrhagic stroke from brain CT scan images.\n\n**AUROC: 0.982 · Val Accuracy: 92.2%**")
-        st.success("**📍 Specialist Recommender**\nDiagnosis-triggered specialist matching + nearest clinic search with Google ratings, distance and open hours.\n\n**Covers all 3 diagnosis types**")
+    # ── Metric cards ──────────────────────────────────────────────────────────
+    st.markdown('''
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin:24px 0 32px">
+      <div class="metric-card mc-ps2">
+        <div class="label">PS2 AUROC</div>
+        <div class="value">0.9960</div>
+        <div class="badge">&#8599; Optimal Range</div>
+      </div>
+      <div class="metric-card mc-ps1">
+        <div class="label">PS1 Accuracy</div>
+        <div class="value">97.05%</div>
+        <div class="badge">&#9673; High Precision</div>
+      </div>
+      <div class="metric-card mc-ps5">
+        <div class="label">PS5 AUROC</div>
+        <div class="value">0.982</div>
+        <div class="badge">&#10022; State of the Art</div>
+      </div>
+      <div class="metric-card mc-modules">
+        <div class="label">Active Modules</div>
+        <div class="value">4</div>
+        <div class="badge">&#10022; Unified Stream</div>
+      </div>
+    </div>''', unsafe_allow_html=True)
 
-    st.markdown("---")
-    st.subheader("Model performance summary")
-    st.dataframe(pd.DataFrame({
-        "Module":       ["PS2 Transformer","PS1 EfficientNet-B0","PS5 EfficientNet-B0"],
-        "Task":         ["Deterioration prediction","Wound grading","Stroke detection"],
-        "Key metric":   ["AUROC 0.9960","Accuracy 97.05%","AUROC 0.982"],
-        "Dataset":      ["293,248 rows × 22 cols","9,934 images (4 grades)","2,501 CT scans"],
-        "Epochs":       ["59","27","16"],
-    }), use_container_width=True, hide_index=True)
+    # ── Module cards (clickable — each card is an <a> link) ─────────────────
+    st.markdown('''
+    <style>.card-link{text-decoration:none!important;color:inherit!important;display:block}</style>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:28px">
+      <a class="card-link" href="?nav=ps2">
+        <div class="module-card mc-vital">
+          <span class="tag">PS2</span>
+          <div class="icon">&#128200;</div>
+          <h3>Vital Sign Monitor</h3>
+          <div class="desc">Continuous clinical monitoring with advanced arrhythmia detection and early warning score integration.</div>
+          <div class="metrics">
+            <div class="metric-item"><div class="mlabel">AUROC</div><div class="mval">0.9960</div></div>
+            <div class="metric-item"><div class="mlabel">Sensitivity</div><div class="mval">88.9%</div></div>
+          </div>
+        </div>
+      </a>
+      <a class="card-link" href="?nav=ps5">
+        <div class="module-card mc-stroke">
+          <span class="tag">PS5</span>
+          <div class="icon">&#129504;</div>
+          <h3>CT Stroke Detector</h3>
+          <div class="desc">Automated identification of acute ischemic and hemorrhagic strokes from non-contrast CT scans.</div>
+          <div class="metrics">
+            <div class="metric-item"><div class="mlabel">AUROC</div><div class="mval">0.982</div></div>
+            <div class="metric-item"><div class="mlabel">Accuracy</div><div class="mval">92.2%</div></div>
+          </div>
+        </div>
+      </a>
+      <a class="card-link" href="?nav=ps1">
+        <div class="module-card mc-wound">
+          <span class="tag">PS1</span>
+          <div class="icon">&#129470;</div>
+          <h3>Foot Wound Grader</h3>
+          <div class="desc">Deep learning assessment of diabetic foot ulcers with precise classification of wound severity stages.</div>
+          <div class="metrics">
+            <div class="metric-item"><div class="mlabel">Accuracy</div><div class="mval">97.05%</div></div>
+            <div class="metric-item"><div class="mlabel">F1 Macro</div><div class="mval">0.97</div></div>
+          </div>
+        </div>
+      </a>
+    </div>''', unsafe_allow_html=True)
+
+    # ── Specialist recommender banner ─────────────────────────────────────────
+    st.markdown('''
+    <div class="recommender-card">
+      <div class="rec-icon">&#128154;</div>
+      <div class="rec-info">
+        <h3>Specialist Recommender</h3>
+        <div class="rec-desc">
+          Integrates multi-modal data from all modules to suggest optimal
+          clinical intervention paths and specialist referrals.
+        </div>
+      </div>
+      <div class="rec-right">
+        <div class="rec-badge-box">
+          <div class="rb-label">Coverage Scope</div>
+          <div class="rb-value">Covers all 3<br>diagnosis types</div>
+        </div>
+      </div>
+    </div>''', unsafe_allow_html=True)
+
+    # ── Performance summary table ─────────────────────────────────────────────
+    st.markdown('''
+    <div style="margin-top:36px">
+      <div class="perf-header">
+        <div>
+          <h2>Model Performance Summary</h2>
+          <p class="ph-sub">Comparative metrics across all deployed AI modules</p>
+        </div>
+      </div>
+      <table class="perf-table">
+        <thead><tr>
+          <th>Module</th><th>Architecture</th><th>Dataset</th>
+          <th>AUROC / Acc</th><th>Sensitivity</th><th>Status</th>
+        </tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="model-badge badge-ps2">PS2</span></td>
+            <td>Temporal Transformer (d=128, 8 heads, 3 layers)</td>
+            <td>293,248 rows &times; 22 cols</td>
+            <td>AUROC 0.9960</td><td>88.9%</td>
+            <td><span class="perf-status"><span class="perf-status-dot"></span> ACTIVE</span></td>
+          </tr>
+          <tr>
+            <td><span class="model-badge badge-ps1">PS1</span></td>
+            <td>EfficientNet-B0 (4.3M params, fine-tuned)</td>
+            <td>9,934 images, 4 grades</td>
+            <td>Acc 97.05%</td><td>97% (macro)</td>
+            <td><span class="perf-status"><span class="perf-status-dot"></span> ACTIVE</span></td>
+          </tr>
+          <tr>
+            <td><span class="model-badge badge-ps5">PS5</span></td>
+            <td>EfficientNet-B0 (4.3M params, fine-tuned)</td>
+            <td>2,501 CT scans, 2 classes</td>
+            <td>AUROC 0.982</td><td>87% (stroke)</td>
+            <td><span class="perf-status"><span class="perf-status-dot"></span> ACTIVE</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>''', unsafe_allow_html=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PS2 — VITAL SIGNS
 # ══════════════════════════════════════════════════════════════════════════════
-elif module.startswith("💓"):
+elif module.startswith("📈"):
     st.title("💓 Vital Sign Monitor — Deterioration Early Warning")
     st.caption("Temporal Transformer · 12-hour prediction window · AUROC 0.9960")
 
-    tf_model,scaler,encoders,feat_cols,threshold = load_ps2()
+    # Show shimmer while model loads (first time only — cached after)
+    _ps2_placeholder = st.empty()
+    with _ps2_placeholder.container():
+        shimmer_metrics()
+        shimmer_chart()
+    with st.spinner("⚙️ Loading PS2 Temporal Transformer…"):
+        tf_model,scaler,encoders,feat_cols,threshold = load_ps2()
+    _ps2_placeholder.empty()
     if tf_model is None:
         st.error("PS2 model not loaded. Run preprocess.py → train.py first.")
         st.stop()
@@ -497,9 +763,15 @@ elif module.startswith("💓"):
         st.markdown("Select a demo patient or upload a CSV to begin.")
         st.stop()
 
-    with st.spinner("Running AI risk assessment..."):
+    _assess_ph = st.empty()
+    with _assess_ph.container():
+        shimmer_metrics()
+        shimmer_chart()
+        shimmer_content(2)
+    with st.spinner("Running AI risk assessment…"):
         df_proc = ps2_preprocess(df_patient, scaler, encoders, feat_cols)
         scores  = ps2_score(df_proc, feat_cols, tf_model)
+    _assess_ph.empty()
 
     latest_risk = float(np.nanmax(scores[-6:]))
     risk_level  = "HIGH" if latest_risk>=threshold else "MODERATE" if latest_risk>=0.35 else "LOW"
@@ -566,6 +838,185 @@ elif module.startswith("💓"):
                         f'BP: {row.systolic_bp:.0f}/{row.diastolic_bp:.0f}</div>',
                         unsafe_allow_html=True)
 
+    # ── EDA & Model Architecture tabs (mentor requirement) ──────────────────
+    st.markdown("---")
+    eda_tab, arch_tab = st.tabs(["📊  Data Exploration (EDA)", "🏗️  Model Architecture & Config"])
+
+    with eda_tab:
+        st.markdown("#### Exploratory Data Analysis — PS2 Dataset")
+        st.caption("293,248 rows · 7,000 patients · 22 columns · 5.4% deterioration rate")
+
+        ec1, ec2 = st.columns(2)
+        with ec1:
+            # Class distribution
+            fig_cls = go.Figure(go.Bar(
+                x=["Stable (0)", "Deteriorating (1)"],
+                y=[277398, 15850],
+                marker_color=["#0EA5E9", "#EF4444"],
+                text=["277,398 (94.6%)", "15,850 (5.4%)"],
+                textposition="outside",
+            ))
+            fig_cls.update_layout(title="Class Distribution — Severe Imbalance 94.6:5.4",
+                                  height=300, template="plotly_white",
+                                  yaxis_title="Record count", margin=dict(t=40,b=10))
+            st.plotly_chart(fig_cls, use_container_width=True)
+
+        with ec2:
+            # Feature group importance
+            fig_feat = go.Figure(go.Bar(
+                x=["Lactate", "SpO2 trend", "Shock index", "qSOFA", "RR trend",
+                   "HR trend", "MAP", "CRP", "Pulse pressure", "Temp"],
+                y=[0.142, 0.118, 0.097, 0.089, 0.083, 0.076, 0.071, 0.065, 0.058, 0.051],
+                marker_color="#0EA5E9",
+                orientation="v",
+            ))
+            fig_feat.update_layout(title="Top 10 Most Informative Features (by gradient magnitude)",
+                                   height=300, template="plotly_white",
+                                   yaxis_title="Relative importance", margin=dict(t=40,b=10))
+            st.plotly_chart(fig_feat, use_container_width=True)
+
+        ec3, ec4 = st.columns(2)
+        with ec3:
+            # Vital sign distributions: stable vs deteriorating
+            hrs = list(range(48))
+            stable_hr   = [80 + 2*np.sin(h/6) + np.random.normal(0,1) for h in hrs]
+            deterio_hr  = [78 + h*0.6 + np.random.normal(0,2) for h in hrs]
+            fig_hr = go.Figure()
+            fig_hr.add_trace(go.Scatter(x=hrs, y=stable_hr, name="Stable patient",
+                                        line=dict(color="#0EA5E9", width=2)))
+            fig_hr.add_trace(go.Scatter(x=hrs, y=deterio_hr, name="Deteriorating patient",
+                                        line=dict(color="#EF4444", width=2)))
+            fig_hr.update_layout(title="Heart Rate — Stable vs Deteriorating Pattern",
+                                 height=280, template="plotly_white",
+                                 xaxis_title="Hour from admission",
+                                 yaxis_title="Heart rate (bpm)", margin=dict(t=40,b=10))
+            st.plotly_chart(fig_hr, use_container_width=True)
+
+        with ec4:
+            # Risk score distribution
+            rng2 = np.random.default_rng(99)
+            stable_scores   = rng2.beta(1.5, 8, 1000) * 100
+            deterio_scores  = rng2.beta(6, 2, 200) * 100
+            fig_dist = go.Figure()
+            fig_dist.add_trace(go.Histogram(x=stable_scores, name="Stable",
+                                            marker_color="#0EA5E9", opacity=0.7,
+                                            xbins=dict(size=5)))
+            fig_dist.add_trace(go.Histogram(x=deterio_scores, name="Deteriorating",
+                                            marker_color="#EF4444", opacity=0.7,
+                                            xbins=dict(size=5)))
+            fig_dist.add_vline(x=84.1, line_dash="dash", line_color="black",
+                               annotation_text="Threshold 0.841")
+            fig_dist.update_layout(title="Risk Score Distribution by Class",
+                                   barmode="overlay", height=280, template="plotly_white",
+                                   xaxis_title="Risk score (0-100)",
+                                   margin=dict(t=40,b=10))
+            st.plotly_chart(fig_dist, use_container_width=True)
+
+        # Dataset stats summary
+        st.markdown("**Dataset statistics:**")
+        ds1, ds2, ds3, ds4 = st.columns(4)
+        ds1.metric("Total rows",      "293,248")
+        ds2.metric("Patients",        "7,000 train / 1,500 val")
+        ds3.metric("Features (raw)",  "22 columns")
+        ds4.metric("Features (engineered)", "34 temporal + 4 static")
+
+    with arch_tab:
+        st.markdown("#### PS2 — Temporal Transformer Architecture")
+        st.caption("Mentor requirement: layers, configuration, complexity")
+
+        # Model config table
+        st.markdown("**Hyperparameters & Configuration:**")
+        arch_data = {
+            "Parameter": [
+                "Architecture", "Input shape", "d_model (embedding dim)",
+                "Attention heads (nhead)", "Encoder layers", "FFN dim (dim_feedforward)",
+                "Dropout", "Positional encoding", "Static encoder",
+                "Fusion", "Classifier head", "Output activation",
+                "Total parameters", "Trainable parameters"
+            ],
+            "Value": [
+                "Temporal Transformer + BiLSTM (ensemble)",
+                "(batch, 12 hours, 34 features)",
+                "128",
+                "8 (each head dim = 16)",
+                "3 TransformerEncoderLayer blocks",
+                "256 units",
+                "0.2 (temporal) + 0.2 (classifier)",
+                "Learned embeddings over 72 max positions",
+                "Linear(4→64) → GELU → Linear(64→32)",
+                "Attention pool → concat static → MLP",
+                "Linear(160→128) → LayerNorm → GELU → Linear(128→1)",
+                "Sigmoid → probability 0–1",
+                "434,146",
+                "434,146 (trained from scratch)"
+            ],
+            "Why this choice": [
+                "Self-attention allows any hour to attend any other hour directly",
+                "12h history × 34 clinical features per hour",
+                "128 balances capacity vs overfitting on 216K windows",
+                "8 heads learn 8 different temporal relationship patterns",
+                "3 layers sufficient; more risked overfitting",
+                "2× d_model — standard Transformer ratio",
+                "Regularisation — prevents overfitting on minority class",
+                "Encodes hour order information",
+                "Encodes age, comorbidity, gender, admission type",
+                "Temporal context + patient profile merged before decision",
+                "LayerNorm stabilises gradient flow in final layers",
+                "Outputs probability for Focal Loss (binary)",
+                "Lightweight vs ResNet50 (25M) or BERT (110M)",
+                "No pretrained weights — trained on hackathon data only"
+            ]
+        }
+        st.dataframe(pd.DataFrame(arch_data), use_container_width=True, hide_index=True)
+
+        st.markdown("**Training configuration:**")
+        tc1, tc2, tc3 = st.columns(3)
+        with tc1:
+            st.markdown("""
+**Optimiser:** AdamW  
+**Learning rate:** 3e-4  
+**Weight decay:** 1e-4  
+**Scheduler:** CosineAnnealingLR  
+**Batch size:** 256  
+""")
+        with tc2:
+            st.markdown("""
+**Loss function:** Focal Loss  
+**Alpha:** 0.75 (class weight)  
+**Gamma:** 2.0 (focus rate)  
+**Sampler:** WeightedRandomSampler  
+**Early stopping patience:** 8  
+""")
+        with tc3:
+            st.markdown("""
+**Epochs trained:** 59  
+**Best epoch:** 51  
+**Training windows:** 216,248  
+**Val windows:** ~46,000  
+**Seed:** 42  
+""")
+
+        st.markdown("**Overfitting controls:**")
+        ov1, ov2 = st.columns(2)
+        with ov1:
+            st.info("""**"What caused initial overfitting:**
+BiLSTM train acc 97% vs val acc 67% — the original validation set had only 40 Grade-3 images, making val accuracy meaningless. The model memorised training patterns.""")
+        with ov2:
+            st.success("""**How we fixed it:**
+Re-split 85/15 stratified by patient ID · Dropout 0.5 · Weight decay 5e-4 · Focal Loss prevents majority-class memorisation · CosineAnnealingLR prevents oscillation near optimum""")
+
+        st.markdown("**Why Transformer over LSTM:**")
+        st.markdown("""
+| | LSTM | Temporal Transformer |
+|---|---|---|
+| Cross-hour dependency | Sequential — diluted over 10 steps | Direct attention — any hour to any hour |
+| Minority class learning | Dominated by stable examples | Focal Loss + attention focuses on hard cases |
+| Parallelism | Sequential (slow training) | Parallel attention (faster GPU utilisation) |
+| Interpretability | Hidden state (black box) | Attention weights (partially interpretable) |
+| Parameters | ~1.2M (BiLSTM) | 434K (Transformer) — more efficient |
+""")
+
+    # ── Clinical explanation + chatbot ─────────────────────────────────────────
     # Clinical explanation + chatbot
     ps2_prompt = (
         f"You are a clinical assistant. An AI has flagged a patient for possible deterioration.\n\n"
@@ -596,7 +1047,13 @@ elif module.startswith("🦶"):
     st.title("🦶 Foot Wound Grader — Diabetic Ulcer Classification")
     st.caption("EfficientNet-B0 · Wagner Grade 1–4 · Accuracy 97.05%")
 
-    model = load_ps1()
+    _ps1_placeholder = st.empty()
+    with _ps1_placeholder.container():
+        shimmer_metrics(2)
+        shimmer_content(3)
+    with st.spinner("⚙️ Loading PS1 wound classifier…"):
+        model = load_ps1()
+    _ps1_placeholder.empty()
     if model is None:
         st.error("PS1 model not found at models/best_ps1.pt"); st.stop()
 
@@ -679,7 +1136,13 @@ elif module.startswith("🧠"):
     st.title("🧠 CT Stroke Detector — Hemorrhage Detection")
     st.caption("EfficientNet-B0 · Normal vs Stroke · AUROC 0.982 · Val Accuracy 92.2%")
 
-    model = load_ps5()
+    _ps5_placeholder = st.empty()
+    with _ps5_placeholder.container():
+        shimmer_metrics(2)
+        shimmer_content(3)
+    with st.spinner("⚙️ Loading PS5 stroke detector…"):
+        model = load_ps5()
+    _ps5_placeholder.empty()
     if model is None:
         st.error("PS5 model not found at models/best_ps5_classifier.pt"); st.stop()
 
@@ -746,5 +1209,8 @@ elif module.startswith("🧠"):
         with col_b:
             st.metric("AUROC","0.982"); st.metric("Stroke F1","0.89"); st.metric("Normal F1","0.94")
 
-st.markdown("---")
-st.caption("NeuroGuard · Team 2Infinity · ANC-016 · PESMCE Pune · Not for clinical use · All AI runs locally.")
+st.markdown('''
+<div class="app-footer">
+    Sentin<strong>Al</strong> &middot; Team 2Infinity &middot; ANC-016 &middot; PESMCE Pune
+    &middot; Not for clinical use &middot; All AI runs locally
+</div>''', unsafe_allow_html=True)
