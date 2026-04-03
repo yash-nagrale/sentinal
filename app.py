@@ -24,7 +24,7 @@ _boot.markdown('''
             padding:140px 0;text-align:center;font-family:Inter,system-ui,sans-serif">
     <div style="font-size:52px;margin-bottom:12px">🛡</div>
     <h2 style="margin:0;color:#0F172A;font-weight:800;letter-spacing:3px;font-size:26px">
-        SENTINEL</h2>
+        SENTINAL</h2>
     <p style="color:#64748B;margin:10px 0 0;font-size:14px">
         Loading clinical AI models &amp; dependencies…</p>
     <div style="width:180px;height:4px;background:#E2E8F0;border-radius:4px;
@@ -633,7 +633,7 @@ with st.sidebar:
     st.markdown('''
     <div class="sidebar-brand">
         <div class="sb-icon">🛡</div>
-        <span class="sb-name">SENTINEL</span>
+        <span class="sb-name">SENTINAL</span>
     </div>
     <div class="sidebar-sub">PESMCE Pune</div>
     ''', unsafe_allow_html=True)
