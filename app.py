@@ -1307,6 +1307,6 @@ elif module.startswith("🧠"):
 
 st.markdown('''
 <div class="app-footer">
-    Sentin<strong>Al</strong> &middot; Team 2Infinity &middot; ANC-016 &middot; PESMCE Pune
+    Sentin<strong>Al</strong> 
     &middot; Not for clinical use &middot; All AI runs locally
 </div>''', unsafe_allow_html=True)
