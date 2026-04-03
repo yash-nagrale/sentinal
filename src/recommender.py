@@ -17,6 +17,9 @@ import math
 # ── Paste your Google Places API key here OR set as environment variable ──────
 GOOGLE_API_KEY = os.environ.get("GOOGLE_PLACES_API_KEY", "YOUR_API_KEY_HERE")
 
+# Readable by app.py to show API errors in the UI
+last_api_error = ""
+
 # ── Specialist mapping: diagnosis → list of specialist types ──────────────────
 # Each entry: (display_name, google_places_type, google_search_keyword)
 SPECIALIST_MAP = {
@@ -161,27 +164,51 @@ def get_specialists_for_diagnosis(diagnosis_key):
 def geocode_location(location_text):
     """
     Converts a text location (city name, pincode, address) to (lat, lng).
-    First checks MAJOR_CITIES dict, then falls back to Google Geocoding API.
-    Returns None if both fail.
+    Tries three sources in order:
+      1. MAJOR_CITIES dict (instant, no API)
+      2. Nominatim / OpenStreetMap (free, no API key, any location)
+      3. Google Geocoding API (if API key set)
+    Returns None if all fail.
     """
-    # Check pre-known cities first (no API needed)
+    query = location_text.lower().strip()
+    if not query:
+        return None
+
+    # 1. Check pre-known cities (instant, no network)
     for city, coords in MAJOR_CITIES.items():
-        if location_text.lower().strip() in city.lower():
+        if query in city.lower():
             return coords
 
-    if GOOGLE_API_KEY == "YOUR_API_KEY_HERE":
-        return None
+    # 2. Nominatim / OpenStreetMap — free, no API key, works worldwide
     try:
-        url = "https://maps.googleapis.com/maps/api/geocode/json"
-        params = {"address": location_text, "key": GOOGLE_API_KEY}
-        r = requests.get(url, params=params, timeout=10)
+        r = requests.get(
+            "https://nominatim.openstreetmap.org/search",
+            params={"q": location_text, "format": "json", "limit": 1},
+            headers={"User-Agent": "SentinAl/1.0 (medical-ai-app)"},
+            timeout=10,
+        )
         data = r.json()
-        if data["status"] == "OK":
-            loc = data["results"][0]["geometry"]["location"]
-            return loc["lat"], loc["lng"]
-        return None
+        if data:
+            return float(data[0]["lat"]), float(data[0]["lon"])
     except Exception:
-        return None
+        pass
+
+    # 3. Google Geocoding API (if key set)
+    if GOOGLE_API_KEY != "YOUR_API_KEY_HERE":
+        try:
+            r = requests.get(
+                "https://maps.googleapis.com/maps/api/geocode/json",
+                params={"address": location_text, "key": GOOGLE_API_KEY},
+                timeout=10,
+            )
+            data = r.json()
+            if data.get("status") == "OK":
+                loc = data["results"][0]["geometry"]["location"]
+                return loc["lat"], loc["lng"]
+        except Exception:
+            pass
+
+    return None
 
 
 def search_nearby_doctors(lat, lng, keyword, place_type="doctor",
@@ -189,7 +216,11 @@ def search_nearby_doctors(lat, lng, keyword, place_type="doctor",
     """
     Searches Google Places API for nearby doctors/clinics/hospitals.
     Returns a list of dicts with name, address, rating, distance, phone, maps_url.
+    Sets `last_api_error` on failure so the caller can display it.
     """
+    global last_api_error
+    last_api_error = ""
+
     if GOOGLE_API_KEY == "YOUR_API_KEY_HERE":
         return _mock_results(keyword, lat, lng)
 
@@ -205,9 +236,16 @@ def search_nearby_doctors(lat, lng, keyword, place_type="doctor",
         r     = requests.get(url, params=params, timeout=10)
         data  = r.json()
 
-        if data.get("status") not in ("OK", "ZERO_RESULTS"):
-            # API error — return empty with reason so caller can display it
-            return []
+        status = data.get("status", "UNKNOWN")
+        if status not in ("OK", "ZERO_RESULTS"):
+            err_msg = data.get("error_message", status)
+            last_api_error = (
+                f"Google Places API error: **{status}** — {err_msg}\n\n"
+                "Make sure the **Places API** is enabled in your "
+                "[Google Cloud Console](https://console.cloud.google.com/apis/library/places-backend.googleapis.com) "
+                "and the API key has no IP/referrer restrictions blocking server-side calls."
+            )
+            return _mock_results(keyword, lat, lng)
 
         results = []
         for place in data.get("results", [])[:max_results]:
@@ -231,8 +269,15 @@ def search_nearby_doctors(lat, lng, keyword, place_type="doctor",
         results.sort(key=lambda x: x["distance_km"])
         return results
 
-    except Exception:
-        return []
+    except requests.exceptions.ConnectionError:
+        last_api_error = "Could not connect to Google Places API. Check your internet connection."
+        return _mock_results(keyword, lat, lng)
+    except requests.exceptions.Timeout:
+        last_api_error = "Google Places API request timed out. Try again."
+        return _mock_results(keyword, lat, lng)
+    except Exception as e:
+        last_api_error = f"Unexpected error calling Google Places API: {e}"
+        return _mock_results(keyword, lat, lng)
 
 
 def get_place_phone(place_id):

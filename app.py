@@ -504,77 +504,45 @@ def show_recommender(diagnosis_key: str):
         st.session_state["_user_location"] = rec.detect_location()
     detected = st.session_state["_user_location"]
 
-    # Build city list; insert detected city if it isn't already in MAJOR_CITIES
-    city_options = list(rec.MAJOR_CITIES.keys())
-    _detected_coords = None          # extra coords for a non-listed city
-    _detected_label  = None
-
-    if detected and detected["city"]:
-        _detected_label = f"{detected['city']}, {detected['region']}"
-        # Check if detected city already exists in the dropdown
-        _match = None
-        for c in city_options:
-            if detected["city"].lower() in c.lower():
-                _match = c
-                break
-        if _match:
-            _detected_label = _match   # use the canonical name
+    # Pre-fill location on first render for this diagnosis
+    loc_key = f"loc_{diagnosis_key}"
+    if loc_key not in st.session_state:
+        if detected and detected["city"]:
+            st.session_state[loc_key] = f"{detected['city']}, {detected['region']}"
         else:
-            # City not in list — add it at the top
-            city_options.insert(0, _detected_label)
-            _detected_coords = (detected["lat"], detected["lon"])
+            st.session_state[loc_key] = "Pune, Maharashtra"
 
-    # Pre-set default on first render for this diagnosis
-    city_key = f"city_{diagnosis_key}"
-    if city_key not in st.session_state and _detected_label:
-        st.session_state[city_key] = _detected_label
-
-    # ── Location selection ────────────────────────────────────────────────────
+    # ── Location input ────────────────────────────────────────────────────────
     st.markdown("**Find nearest specialists:**")
-
-    col_city, col_btn = st.columns([3, 1])
-    with col_city:
-        selected_city = st.selectbox(
-            "Select your city",
-            city_options,
-            key=city_key,
+    col_loc, col_btn = st.columns([3, 1])
+    with col_loc:
+        location_input = st.text_input(
+            "Enter your city or location",
+            placeholder="e.g. Wardha, Pune, 411005, or any address",
+            key=loc_key,
             label_visibility="collapsed",
         )
     with col_btn:
         search_btn = st.button("🔍 Search", key=f"search_{diagnosis_key}",
                                use_container_width=True)
 
-    custom_loc = st.text_input(
-        "Or enter a location manually (needs API key)",
-        placeholder="e.g. Connaught Place Delhi, 400001, or a specific address",
-        key=f"custom_loc_{diagnosis_key}",
-        label_visibility="visible",
-    )
-
     if not is_live:
-        st.caption("ℹ️ Demo mode — add your Google Places API key in the **sidebar** "
-                   "for live results.")
+        st.caption("ℹ️ Demo mode — add a Google Places API key in the **sidebar** "
+                   "for live hospital results. Location search works without a key.")
 
     # ── Resolve location ──────────────────────────────────────────────────────
-    use_custom = bool(custom_loc and custom_loc.strip())
-    location_label = custom_loc.strip() if use_custom else selected_city
+    location_label = location_input.strip() if location_input else "Pune, Maharashtra"
 
     # Auto-search on first render; manual search via button afterwards
     first_load = f"results_{diagnosis_key}" not in st.session_state
 
     def _run_search():
         """Geocode + search and store results in session state."""
-        if use_custom:
-            coords = rec.geocode_location(custom_loc.strip())
-            if coords is None:
-                st.warning(f"Could not find **{custom_loc.strip()}**. "
-                           f"Showing results for **{selected_city}** instead.")
-                coords = rec.MAJOR_CITIES.get(selected_city, (18.5204, 73.8567))
-        elif _detected_coords and selected_city == _detected_label:
-            # IP-detected city not in MAJOR_CITIES — use detected coords
-            coords = _detected_coords
-        else:
-            coords = rec.MAJOR_CITIES.get(selected_city, (18.5204, 73.8567))
+        coords = rec.geocode_location(location_label)
+        if coords is None:
+            st.error(f"Could not find **{location_label}**. "
+                     "Check the spelling and try again.")
+            return False
 
         all_results = {}
         for name, ptype, keyword in info["specialists"]:
@@ -587,21 +555,27 @@ def show_recommender(diagnosis_key: str):
         st.session_state[f"results_{diagnosis_key}"]  = all_results
         st.session_state[f"coords_{diagnosis_key}"]   = coords
         st.session_state[f"loc_used_{diagnosis_key}"]  = location_label
+        return True
 
     if search_btn or first_load:
         _doc_ph = st.empty()
         with _doc_ph.container():
             shimmer_cards(3)
         with st.spinner(f"Searching for specialists near {location_label}…"):
-            _run_search()
+            ok = _run_search()
         _doc_ph.empty()
+
+        # Show API errors (e.g. wrong key, API not enabled)
+        if rec.last_api_error:
+            st.warning(rec.last_api_error)
+        if ok is False:
+            return
 
     # ── Display results ───────────────────────────────────────────────────────
     all_results = st.session_state.get(f"results_{diagnosis_key}", {})
     loc_used    = st.session_state.get(f"loc_used_{diagnosis_key}", location_label)
 
     if not all_results:
-        st.info("No results found. Try a different city or a broader location.")
         return
 
     # Hint if location changed but results are stale
