@@ -345,19 +345,13 @@ _FOOT_WOUND_THRESHOLD = 0.25  # minimum probability for the foot-wound label
 
 @st.cache_resource
 def _load_clip():
-    """Load CLIP model and pre-compute text embeddings (labels never change)."""
+    """Load CLIP model + processor. Cached across reruns."""
     from transformers import CLIPProcessor, CLIPModel
-    clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
-    processor  = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+    clip_model = CLIPModel.from_pretrained(
+        "openai/clip-vit-base-patch32", use_safetensors=True)
+    processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
     clip_model.eval()
-
-    # Pre-compute text embeddings once — they're reused for every image
-    text_inputs = processor(text=_FOOT_WOUND_LABELS, return_tensors="pt", padding=True)
-    with torch.no_grad():
-        text_embeds = clip_model.get_text_features(**text_inputs)
-        text_embeds = text_embeds / text_embeds.norm(dim=-1, keepdim=True)
-
-    return clip_model, processor, text_embeds
+    return clip_model, processor
 
 
 def validate_foot_wound_image(img) -> tuple:
@@ -366,19 +360,16 @@ def validate_foot_wound_image(img) -> tuple:
     Returns (is_valid: bool, message: str).
     """
     try:
-        clip_model, processor, text_embeds = _load_clip()
+        clip_model, processor = _load_clip()
     except Exception:
         return True, "clip_unavailable"
 
-    # Only encode the image — text embeddings are already cached
-    image_inputs = processor(images=img, return_tensors="pt")
+    # Single forward pass — returns logits_per_image directly (version-safe)
+    inputs = processor(text=_FOOT_WOUND_LABELS, images=img,
+                       return_tensors="pt", padding=True)
     with torch.no_grad():
-        image_embeds = clip_model.get_image_features(**image_inputs)
-        image_embeds = image_embeds / image_embeds.norm(dim=-1, keepdim=True)
-        # CLIP logit scale
-        logit_scale = clip_model.logit_scale.exp()
-        logits = (image_embeds @ text_embeds.T) * logit_scale
-        probs = logits.softmax(dim=1)[0].cpu().numpy()
+        outputs = clip_model(**inputs)
+    probs = outputs.logits_per_image.softmax(dim=1)[0].cpu().numpy()
 
     foot_wound_prob = float(probs[0])
     best_idx = int(probs.argmax())
