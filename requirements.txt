@@ -8,3 +8,4 @@ Pillow
 requests
 scikit-learn
 matplotlib
+transformers
