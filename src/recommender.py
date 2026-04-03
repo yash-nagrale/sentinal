@@ -1,7 +1,7 @@
 """
 recommender.py
 --------------
-Nearest Doctor / Specialist Recommender for NeuroGuard.
+Nearest Doctor / Specialist Recommender for SentinAl.
 
 Usage from other modules:
     from recommender import get_specialists_for_diagnosis, search_nearby_doctors
@@ -80,8 +80,65 @@ URGENCY_MAP = {
     "ps5_normal":   ("🟢 Routine",   "Follow up with a neurologist if symptoms persist."),
 }
 
+# ── Major Indian cities — pre-known coordinates (no geocoding API needed) ─────
+MAJOR_CITIES = {
+    "Pune, Maharashtra":                (18.5204, 73.8567),
+    "Mumbai, Maharashtra":              (19.0760, 72.8777),
+    "Delhi":                            (28.6139, 77.2090),
+    "Bangalore, Karnataka":             (12.9716, 77.5946),
+    "Hyderabad, Telangana":             (17.3850, 78.4867),
+    "Chennai, Tamil Nadu":              (13.0827, 80.2707),
+    "Kolkata, West Bengal":             (22.5726, 88.3639),
+    "Ahmedabad, Gujarat":              (23.0225, 72.5714),
+    "Jaipur, Rajasthan":               (26.9124, 75.7873),
+    "Lucknow, Uttar Pradesh":          (26.8467, 80.9462),
+    "Chandigarh":                       (30.7333, 76.7794),
+    "Nagpur, Maharashtra":              (21.1458, 79.0882),
+    "Indore, Madhya Pradesh":           (22.7196, 75.8577),
+    "Bhopal, Madhya Pradesh":           (23.2599, 77.4126),
+    "Patna, Bihar":                     (25.6093, 85.1376),
+    "Coimbatore, Tamil Nadu":           (11.0168, 76.9558),
+    "Kochi, Kerala":                    (9.9312, 76.2673),
+    "Thiruvananthapuram, Kerala":       (8.5241, 76.9366),
+    "Visakhapatnam, Andhra Pradesh":    (17.6868, 83.2185),
+    "Guwahati, Assam":                  (26.1445, 91.7362),
+    "Surat, Gujarat":                   (21.1702, 72.8311),
+    "Vadodara, Gujarat":                (22.3072, 73.1812),
+    "Nashik, Maharashtra":              (19.9975, 73.7898),
+    "Aurangabad, Maharashtra":          (19.8762, 75.3433),
+    "Mysore, Karnataka":                (12.2958, 76.6394),
+    "Mangalore, Karnataka":             (12.9141, 74.8560),
+    "Dehradun, Uttarakhand":            (30.3165, 78.0322),
+    "Ranchi, Jharkhand":                (23.3441, 85.3096),
+    "Raipur, Chhattisgarh":            (21.2514, 81.6296),
+    "Bhubaneswar, Odisha":              (20.2961, 85.8245),
+    "Goa":                              (15.2993, 74.1240),
+}
 
-def get_specialists_for_diagnosis(diagnosis_key: str) -> dict:
+
+def detect_location():
+    """
+    Detect user's approximate location via IP geolocation (ip-api.com).
+    Free, no API key needed, ~45 requests/min limit.
+    Returns {"city", "region", "lat", "lon"} or None on failure.
+    """
+    try:
+        r = requests.get("http://ip-api.com/json/", timeout=5)
+        if r.status_code == 200:
+            data = r.json()
+            if data.get("status") == "success":
+                return {
+                    "city":   data.get("city", ""),
+                    "region": data.get("regionName", ""),
+                    "lat":    data.get("lat"),
+                    "lon":    data.get("lon"),
+                }
+    except Exception:
+        pass
+    return None
+
+
+def get_specialists_for_diagnosis(diagnosis_key):
     """
     Returns specialist list + urgency for a given diagnosis key.
     Works completely offline — no API key needed.
@@ -101,12 +158,17 @@ def get_specialists_for_diagnosis(diagnosis_key: str) -> dict:
     }
 
 
-def geocode_location(location_text: str) -> tuple[float, float] | None:
+def geocode_location(location_text):
     """
     Converts a text location (city name, pincode, address) to (lat, lng).
-    Uses Google Geocoding API.
-    Returns None if geocoding fails.
+    First checks MAJOR_CITIES dict, then falls back to Google Geocoding API.
+    Returns None if both fail.
     """
+    # Check pre-known cities first (no API needed)
+    for city, coords in MAJOR_CITIES.items():
+        if location_text.lower().strip() in city.lower():
+            return coords
+
     if GOOGLE_API_KEY == "YOUR_API_KEY_HERE":
         return None
     try:
@@ -122,34 +184,32 @@ def geocode_location(location_text: str) -> tuple[float, float] | None:
         return None
 
 
-def search_nearby_doctors(
-    lat: float,
-    lng: float,
-    keyword: str,
-    radius_m: int = 5000,
-    max_results: int = 5,
-) -> list[dict]:
+def search_nearby_doctors(lat, lng, keyword, place_type="doctor",
+                          radius_m=15000, max_results=5):
     """
-    Searches Google Places API for nearby doctors/clinics.
+    Searches Google Places API for nearby doctors/clinics/hospitals.
     Returns a list of dicts with name, address, rating, distance, phone, maps_url.
     """
     if GOOGLE_API_KEY == "YOUR_API_KEY_HERE":
         return _mock_results(keyword, lat, lng)
 
     try:
-        # Nearby Search
         url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
         params = {
             "location": f"{lat},{lng}",
             "radius":   radius_m,
             "keyword":  keyword,
-            "type":     "doctor",
+            "type":     place_type,
             "key":      GOOGLE_API_KEY,
         }
         r     = requests.get(url, params=params, timeout=10)
         data  = r.json()
-        results = []
 
+        if data.get("status") not in ("OK", "ZERO_RESULTS"):
+            # API error — return empty with reason so caller can display it
+            return []
+
+        results = []
         for place in data.get("results", [])[:max_results]:
             place_lat = place["geometry"]["location"]["lat"]
             place_lng = place["geometry"]["location"]["lng"]
@@ -168,15 +228,14 @@ def search_nearby_doctors(
             }
             results.append(result)
 
-        # Sort by distance
         results.sort(key=lambda x: x["distance_km"])
         return results
 
-    except Exception as e:
-        return _mock_results(keyword, lat, lng)
+    except Exception:
+        return []
 
 
-def get_place_phone(place_id: str) -> str | None:
+def get_place_phone(place_id):
     """Fetches phone number for a place using Place Details API."""
     if GOOGLE_API_KEY == "YOUR_API_KEY_HERE" or not place_id:
         return None
@@ -194,7 +253,7 @@ def get_place_phone(place_id: str) -> str | None:
         return None
 
 
-def _haversine(lat1, lon1, lat2, lon2) -> float:
+def _haversine(lat1, lon1, lat2, lon2):
     """Returns distance in km between two lat/lng points."""
     R    = 6371
     dlat = math.radians(lat2 - lat1)
@@ -206,15 +265,24 @@ def _haversine(lat1, lon1, lat2, lon2) -> float:
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
-def _mock_results(keyword: str, lat: float, lng: float) -> list[dict]:
+def _mock_results(keyword, lat, lng):
     """
     Returns demo results when API key is not set.
     Used during development and for hackathon demo.
     """
+    # Find the closest known city for realistic labels
+    city_label = "your area"
+    best_dist = float("inf")
+    for name, (clat, clng) in MAJOR_CITIES.items():
+        d = _haversine(lat, lng, clat, clng)
+        if d < best_dist:
+            best_dist = d
+            city_label = name.split(",")[0]  # "Pune" from "Pune, Maharashtra"
+
     return [
         {
             "name":       f"City Medical Centre — {keyword.title()}",
-            "address":    "Near Shivajinagar, Pune, Maharashtra",
+            "address":    f"Near Central Area, {city_label}",
             "rating":     4.6,
             "user_ratings_total": 312,
             "distance_km": 1.2,
@@ -224,8 +292,8 @@ def _mock_results(keyword: str, lat: float, lng: float) -> list[dict]:
             "phone":      "+91 20 2553 1234",
         },
         {
-            "name":       f"Ruby Hall Clinic — {keyword.title()} Dept.",
-            "address":    "40 Sassoon Road, Pune, Maharashtra 411001",
+            "name":       f"General Hospital — {keyword.title()} Dept.",
+            "address":    f"Main Road, {city_label}",
             "rating":     4.8,
             "user_ratings_total": 1847,
             "distance_km": 2.4,
@@ -235,8 +303,8 @@ def _mock_results(keyword: str, lat: float, lng: float) -> list[dict]:
             "phone":      "+91 20 6645 5555",
         },
         {
-            "name":       f"Sahyadri Hospitals — {keyword.title()}",
-            "address":    "30 Karve Road, Pune, Maharashtra 411004",
+            "name":       f"Apollo Clinic — {keyword.title()}",
+            "address":    f"Station Road, {city_label}",
             "rating":     4.5,
             "user_ratings_total": 924,
             "distance_km": 3.1,
@@ -246,8 +314,8 @@ def _mock_results(keyword: str, lat: float, lng: float) -> list[dict]:
             "phone":      "+91 20 6721 3333",
         },
         {
-            "name":       f"KEM Hospital — {keyword.title()}",
-            "address":    "489 Rasta Peth, Pune, Maharashtra 411011",
+            "name":       f"District Hospital — {keyword.title()}",
+            "address":    f"Civil Lines, {city_label}",
             "rating":     4.3,
             "user_ratings_total": 2103,
             "distance_km": 4.7,
@@ -261,7 +329,7 @@ def _mock_results(keyword: str, lat: float, lng: float) -> list[dict]:
 
 # ── Quick self-test ────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    print("=== NeuroGuard Specialist Recommender — Self Test ===\n")
+    print("=== SentinAl Specialist Recommender — Self Test ===\n")
 
     for key in ["ps2_high", "ps1_grade3", "ps5_stroke"]:
         info = get_specialists_for_diagnosis(key)
@@ -270,6 +338,11 @@ if __name__ == "__main__":
         print(f"  Specialists:")
         for name, ptype, kw in info["specialists"]:
             print(f"    • {name} (search: '{kw}')")
+
+    print(f"\n=== Known cities: {len(MAJOR_CITIES)} ===")
+    for city in list(MAJOR_CITIES.keys())[:5]:
+        print(f"  {city}: {MAJOR_CITIES[city]}")
+    print("  ...")
 
     print("\n=== Mock location search (Pune) ===")
     results = search_nearby_doctors(18.5204, 73.8567, "neurologist brain specialist")
