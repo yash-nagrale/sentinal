@@ -24,8 +24,8 @@ pip-wheel-metadata/
 data/processed/
 
 # Model weights and checkpoints
-models/
-*.pt
+# models/
+# *.pt
 
 # Output files from predictions/evaluation
 outputs/

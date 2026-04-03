@@ -543,9 +543,9 @@ with st.sidebar:
     st.markdown('''
     <div class="sidebar-brand">
         <div class="sb-icon">🛡</div>
-        <span class="sb-name">SENTINEL</span>
+        <span class="sb-name">SENTINAL</span>
     </div>
-    <div class="sidebar-sub">PESMCE Pune</div>
+    <div class="sidebar-sub">Predict Early. Protect Lives.</div>
     ''', unsafe_allow_html=True)
     st.markdown("---")
     module = st.radio("Module", [
