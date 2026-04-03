@@ -3,71 +3,44 @@ recommender.py
 --------------
 Nearest Doctor / Specialist Recommender for SentinAl.
 
-Usage from other modules:
-    from recommender import get_specialists_for_diagnosis, search_nearby_doctors
+Uses 100% free APIs — no API keys required:
+  - Nominatim (OpenStreetMap) for geocoding any location
+  - Overpass API (OpenStreetMap) for finding nearby hospitals & clinics
+  - ip-api.com for IP-based location detection
 
-Run standalone test:
-    py -3.11 recommender.py
+Usage from other modules:
+    from recommender import get_specialists_for_diagnosis, search_nearby_facilities
 """
 
 import requests
-import os
 import math
 
-# ── Paste your Google Places API key here OR set as environment variable ──────
-GOOGLE_API_KEY = os.environ.get("GOOGLE_PLACES_API_KEY", "YOUR_API_KEY_HERE")
-
-# Readable by app.py to show API errors in the UI
-last_api_error = ""
-
-# ── Specialist mapping: diagnosis → list of specialist types ──────────────────
-# Each entry: (display_name, google_places_type, google_search_keyword)
+# ── Specialist mapping: diagnosis → list of recommended specialist types ──────
 SPECIALIST_MAP = {
     # PS2 — Vital sign deterioration
     "ps2_high": [
-        ("Intensivist / Critical Care",   "hospital",       "critical care ICU specialist"),
-        ("General Physician",             "doctor",         "general physician"),
-        ("Cardiologist",                  "doctor",         "cardiologist heart specialist"),
+        "Intensivist / Critical Care",
+        "General Physician",
+        "Cardiologist",
     ],
     "ps2_moderate": [
-        ("General Physician",             "doctor",         "general physician"),
-        ("Internal Medicine Specialist",  "doctor",         "internal medicine specialist"),
-        ("Cardiologist",                  "doctor",         "cardiologist"),
+        "General Physician",
+        "Internal Medicine Specialist",
+        "Cardiologist",
     ],
     "ps2_low": [
-        ("General Physician",             "doctor",         "general physician"),
+        "General Physician",
     ],
 
     # PS1 — Foot wound grading
-    "ps1_grade1": [
-        ("General Physician",             "doctor",         "general physician"),
-        ("Podiatrist",                    "doctor",         "podiatrist foot doctor"),
-    ],
-    "ps1_grade2": [
-        ("Podiatrist",                    "doctor",         "podiatrist foot doctor"),
-        ("Diabetologist",                 "doctor",         "diabetologist diabetes specialist"),
-    ],
-    "ps1_grade3": [
-        ("Podiatrist",                    "doctor",         "podiatrist foot doctor"),
-        ("Vascular Surgeon",              "doctor",         "vascular surgeon"),
-        ("Diabetologist",                 "doctor",         "diabetologist diabetes specialist"),
-    ],
-    "ps1_grade4": [
-        ("Vascular Surgeon",              "doctor",         "vascular surgeon"),
-        ("Orthopedic Surgeon",            "doctor",         "orthopedic surgeon"),
-        ("Podiatrist",                    "doctor",         "podiatrist foot doctor"),
-    ],
+    "ps1_grade1": ["General Physician", "Podiatrist"],
+    "ps1_grade2": ["Podiatrist", "Diabetologist"],
+    "ps1_grade3": ["Podiatrist", "Vascular Surgeon", "Diabetologist"],
+    "ps1_grade4": ["Vascular Surgeon", "Orthopedic Surgeon", "Podiatrist"],
 
     # PS5 — CT Stroke detection
-    "ps5_stroke": [
-        ("Neurologist",                   "doctor",         "neurologist brain specialist"),
-        ("Neurosurgeon",                  "doctor",         "neurosurgeon"),
-        ("Emergency Physician",           "hospital",       "emergency hospital stroke centre"),
-    ],
-    "ps5_normal": [
-        ("Neurologist",                   "doctor",         "neurologist"),
-        ("General Physician",             "doctor",         "general physician"),
-    ],
+    "ps5_stroke": ["Neurologist", "Neurosurgeon", "Emergency Physician"],
+    "ps5_normal": ["Neurologist", "General Physician"],
 }
 
 # ── Urgency messages ──────────────────────────────────────────────────────────
@@ -83,7 +56,7 @@ URGENCY_MAP = {
     "ps5_normal":   ("🟢 Routine",   "Follow up with a neurologist if symptoms persist."),
 }
 
-# ── Major Indian cities — pre-known coordinates (no geocoding API needed) ─────
+# ── Major Indian cities — pre-known coordinates (instant lookup, no network) ──
 MAJOR_CITIES = {
     "Pune, Maharashtra":                (18.5204, 73.8567),
     "Mumbai, Maharashtra":              (19.0760, 72.8777),
@@ -118,6 +91,8 @@ MAJOR_CITIES = {
     "Goa":                              (15.2993, 74.1240),
 }
 
+_OSM_HEADERS = {"User-Agent": "SentinAl/1.0 (medical-ai-app)"}
+
 
 def detect_location():
     """
@@ -145,47 +120,41 @@ def get_specialists_for_diagnosis(diagnosis_key):
     """
     Returns specialist list + urgency for a given diagnosis key.
     Works completely offline — no API key needed.
-
-    diagnosis_key options:
-        ps2_high, ps2_moderate, ps2_low
-        ps1_grade1, ps1_grade2, ps1_grade3, ps1_grade4
-        ps5_stroke, ps5_normal
     """
     specialists = SPECIALIST_MAP.get(diagnosis_key, SPECIALIST_MAP["ps2_low"])
-    urgency_level, urgency_msg = URGENCY_MAP.get(diagnosis_key, ("🟢 Routine", "Consult a doctor."))
+    urgency_level, urgency_msg = URGENCY_MAP.get(
+        diagnosis_key, ("🟢 Routine", "Consult a doctor."))
     return {
-        "diagnosis_key":  diagnosis_key,
-        "urgency_level":  urgency_level,
+        "diagnosis_key":   diagnosis_key,
+        "urgency_level":   urgency_level,
         "urgency_message": urgency_msg,
-        "specialists":    specialists,  # list of (display_name, places_type, keyword)
+        "specialists":     specialists,
     }
 
 
 def geocode_location(location_text):
     """
-    Converts a text location (city name, pincode, address) to (lat, lng).
-    Tries three sources in order:
-      1. MAJOR_CITIES dict (instant, no API)
-      2. Nominatim / OpenStreetMap (free, no API key, any location)
-      3. Google Geocoding API (if API key set)
-    Returns None if all fail.
+    Converts a text location (city, pincode, address) to (lat, lng).
+    Uses:
+      1. MAJOR_CITIES dict (instant, no network)
+      2. Nominatim / OpenStreetMap (free, no API key, any location worldwide)
+    Returns None if both fail.
     """
     query = location_text.lower().strip()
     if not query:
         return None
 
-    # 1. Check pre-known cities (instant, no network)
+    # 1. Check pre-known cities (instant)
     for city, coords in MAJOR_CITIES.items():
         if query in city.lower():
             return coords
 
-    # 2. Nominatim / OpenStreetMap — free, no API key, works worldwide
+    # 2. Nominatim — free, no API key, any location
     try:
         r = requests.get(
             "https://nominatim.openstreetmap.org/search",
             params={"q": location_text, "format": "json", "limit": 1},
-            headers={"User-Agent": "SentinAl/1.0 (medical-ai-app)"},
-            timeout=10,
+            headers=_OSM_HEADERS, timeout=10,
         )
         data = r.json()
         if data:
@@ -193,109 +162,89 @@ def geocode_location(location_text):
     except Exception:
         pass
 
-    # 3. Google Geocoding API (if key set)
-    if GOOGLE_API_KEY != "YOUR_API_KEY_HERE":
-        try:
-            r = requests.get(
-                "https://maps.googleapis.com/maps/api/geocode/json",
-                params={"address": location_text, "key": GOOGLE_API_KEY},
-                timeout=10,
-            )
-            data = r.json()
-            if data.get("status") == "OK":
-                loc = data["results"][0]["geometry"]["location"]
-                return loc["lat"], loc["lng"]
-        except Exception:
-            pass
-
     return None
 
 
-def search_nearby_doctors(lat, lng, keyword, place_type="doctor",
-                          radius_m=15000, max_results=5):
+def search_nearby_facilities(lat, lng, radius_m=15000, max_results=10):
     """
-    Searches Google Places API for nearby doctors/clinics/hospitals.
-    Returns a list of dicts with name, address, rating, distance, phone, maps_url.
-    Sets `last_api_error` on failure so the caller can display it.
-    """
-    global last_api_error
-    last_api_error = ""
+    Search for hospitals, clinics, and doctor offices near a location
+    using the Overpass API (OpenStreetMap). Free, no API key.
 
-    if GOOGLE_API_KEY == "YOUR_API_KEY_HERE":
-        return _mock_results(keyword, lat, lng)
+    Returns a list of dicts sorted by distance:
+        name, facility_type, address, distance_km, phone, website,
+        opening_hours, maps_url, lat, lon
+    """
+    query = (
+        f'[out:json][timeout:20];'
+        f'('
+        f'  node["amenity"~"hospital|clinic|doctors"](around:{radius_m},{lat},{lng});'
+        f'  way["amenity"~"hospital|clinic|doctors"](around:{radius_m},{lat},{lng});'
+        f');'
+        f'out center;'
+    )
 
     try:
-        url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
-        params = {
-            "location": f"{lat},{lng}",
-            "radius":   radius_m,
-            "keyword":  keyword,
-            "type":     place_type,
-            "key":      GOOGLE_API_KEY,
-        }
-        r     = requests.get(url, params=params, timeout=10)
-        data  = r.json()
+        r = requests.post(
+            "https://overpass-api.de/api/interpreter",
+            data={"data": query},
+            headers=_OSM_HEADERS,
+            timeout=25,
+        )
+        if r.status_code != 200:
+            return []
 
-        status = data.get("status", "UNKNOWN")
-        if status not in ("OK", "ZERO_RESULTS"):
-            err_msg = data.get("error_message", status)
-            last_api_error = (
-                f"Google Places API error: **{status}** — {err_msg}\n\n"
-                "Make sure the **Places API** is enabled in your "
-                "[Google Cloud Console](https://console.cloud.google.com/apis/library/places-backend.googleapis.com) "
-                "and the API key has no IP/referrer restrictions blocking server-side calls."
-            )
-            return _mock_results(keyword, lat, lng)
-
+        elements = r.json().get("elements", [])
         results = []
-        for place in data.get("results", [])[:max_results]:
-            place_lat = place["geometry"]["location"]["lat"]
-            place_lng = place["geometry"]["location"]["lng"]
-            dist_km   = _haversine(lat, lng, place_lat, place_lng)
+        seen = set()
 
-            result = {
-                "name":       place.get("name", "Unknown"),
-                "address":    place.get("vicinity", "Address not available"),
-                "rating":     place.get("rating", None),
-                "user_ratings_total": place.get("user_ratings_total", 0),
-                "distance_km": round(dist_km, 2),
-                "open_now":   place.get("opening_hours", {}).get("open_now", None),
-                "place_id":   place.get("place_id", ""),
-                "maps_url":   f"https://maps.google.com/?q={place_lat},{place_lng}",
-                "phone":      None,  # fetched separately if needed
-            }
-            results.append(result)
+        for el in elements:
+            tags = el.get("tags", {})
+            name = tags.get("name")
+            if not name or name.lower() in seen:
+                continue
+            seen.add(name.lower())
+
+            # Coordinates — nodes have lat/lon directly, ways have center
+            el_lat = el.get("lat") or (el.get("center", {}).get("lat"))
+            el_lng = el.get("lon") or (el.get("center", {}).get("lon"))
+            if not el_lat or not el_lng:
+                continue
+
+            dist = _haversine(lat, lng, el_lat, el_lng)
+
+            # Build address from addr:* tags
+            addr_parts = []
+            for key in ("addr:street", "addr:city", "addr:postcode"):
+                val = tags.get(key)
+                if val:
+                    addr_parts.append(val)
+            address = ", ".join(addr_parts) if addr_parts else "Address not listed"
+
+            amenity = tags.get("amenity", "hospital")
+            type_label = {
+                "hospital": "Hospital",
+                "clinic":   "Clinic",
+                "doctors":  "Doctor",
+            }.get(amenity, "Medical")
+
+            results.append({
+                "name":          name,
+                "facility_type": type_label,
+                "address":       address,
+                "distance_km":   round(dist, 2),
+                "phone":         tags.get("phone") or tags.get("contact:phone"),
+                "website":       tags.get("website") or tags.get("contact:website"),
+                "opening_hours": tags.get("opening_hours"),
+                "maps_url":      f"https://maps.google.com/?q={el_lat},{el_lng}",
+                "lat":           el_lat,
+                "lon":           el_lng,
+            })
 
         results.sort(key=lambda x: x["distance_km"])
-        return results
+        return results[:max_results]
 
-    except requests.exceptions.ConnectionError:
-        last_api_error = "Could not connect to Google Places API. Check your internet connection."
-        return _mock_results(keyword, lat, lng)
-    except requests.exceptions.Timeout:
-        last_api_error = "Google Places API request timed out. Try again."
-        return _mock_results(keyword, lat, lng)
-    except Exception as e:
-        last_api_error = f"Unexpected error calling Google Places API: {e}"
-        return _mock_results(keyword, lat, lng)
-
-
-def get_place_phone(place_id):
-    """Fetches phone number for a place using Place Details API."""
-    if GOOGLE_API_KEY == "YOUR_API_KEY_HERE" or not place_id:
-        return None
-    try:
-        url = "https://maps.googleapis.com/maps/api/place/details/json"
-        params = {
-            "place_id": place_id,
-            "fields":   "formatted_phone_number",
-            "key":      GOOGLE_API_KEY,
-        }
-        r    = requests.get(url, params=params, timeout=8)
-        data = r.json()
-        return data.get("result", {}).get("formatted_phone_number")
     except Exception:
-        return None
+        return []
 
 
 def _haversine(lat1, lon1, lat2, lon2):
@@ -310,68 +259,6 @@ def _haversine(lat1, lon1, lat2, lon2):
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
-def _mock_results(keyword, lat, lng):
-    """
-    Returns demo results when API key is not set.
-    Used during development and for hackathon demo.
-    """
-    # Find the closest known city for realistic labels
-    city_label = "your area"
-    best_dist = float("inf")
-    for name, (clat, clng) in MAJOR_CITIES.items():
-        d = _haversine(lat, lng, clat, clng)
-        if d < best_dist:
-            best_dist = d
-            city_label = name.split(",")[0]  # "Pune" from "Pune, Maharashtra"
-
-    return [
-        {
-            "name":       f"City Medical Centre — {keyword.title()}",
-            "address":    f"Near Central Area, {city_label}",
-            "rating":     4.6,
-            "user_ratings_total": 312,
-            "distance_km": 1.2,
-            "open_now":   True,
-            "place_id":   "demo_1",
-            "maps_url":   f"https://maps.google.com/?q={lat+0.01},{lng+0.01}",
-            "phone":      "+91 20 2553 1234",
-        },
-        {
-            "name":       f"General Hospital — {keyword.title()} Dept.",
-            "address":    f"Main Road, {city_label}",
-            "rating":     4.8,
-            "user_ratings_total": 1847,
-            "distance_km": 2.4,
-            "open_now":   True,
-            "place_id":   "demo_2",
-            "maps_url":   f"https://maps.google.com/?q={lat+0.02},{lng+0.02}",
-            "phone":      "+91 20 6645 5555",
-        },
-        {
-            "name":       f"Apollo Clinic — {keyword.title()}",
-            "address":    f"Station Road, {city_label}",
-            "rating":     4.5,
-            "user_ratings_total": 924,
-            "distance_km": 3.1,
-            "open_now":   False,
-            "place_id":   "demo_3",
-            "maps_url":   f"https://maps.google.com/?q={lat+0.03},{lng+0.03}",
-            "phone":      "+91 20 6721 3333",
-        },
-        {
-            "name":       f"District Hospital — {keyword.title()}",
-            "address":    f"Civil Lines, {city_label}",
-            "rating":     4.3,
-            "user_ratings_total": 2103,
-            "distance_km": 4.7,
-            "open_now":   True,
-            "place_id":   "demo_4",
-            "maps_url":   f"https://maps.google.com/?q={lat+0.04},{lng+0.04}",
-            "phone":      "+91 20 6123 4567",
-        },
-    ]
-
-
 # ── Quick self-test ────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     print("=== SentinAl Specialist Recommender — Self Test ===\n")
@@ -380,24 +267,19 @@ if __name__ == "__main__":
         info = get_specialists_for_diagnosis(key)
         print(f"Diagnosis: {key}")
         print(f"  Urgency : {info['urgency_level']} — {info['urgency_message']}")
-        print(f"  Specialists:")
-        for name, ptype, kw in info["specialists"]:
-            print(f"    • {name} (search: '{kw}')")
+        print(f"  Specialists: {', '.join(info['specialists'])}")
 
-    print(f"\n=== Known cities: {len(MAJOR_CITIES)} ===")
-    for city in list(MAJOR_CITIES.keys())[:5]:
-        print(f"  {city}: {MAJOR_CITIES[city]}")
-    print("  ...")
+    print(f"\n=== Geocode 'Wardha' ===")
+    coords = geocode_location("Wardha")
+    print(f"  Coordinates: {coords}")
 
-    print("\n=== Mock location search (Pune) ===")
-    results = search_nearby_doctors(18.5204, 73.8567, "neurologist brain specialist")
-    for r in results:
-        stars = f"⭐ {r['rating']}" if r['rating'] else "No rating"
-        open_status = "Open" if r['open_now'] else ("Closed" if r['open_now'] is False else "Unknown")
-        print(f"\n  {r['name']}")
-        print(f"    {r['address']}")
-        print(f"    {stars} ({r['user_ratings_total']} reviews) · {r['distance_km']} km · {open_status}")
-        print(f"    📞 {r['phone'] or 'N/A'}")
-        print(f"    🗺  {r['maps_url']}")
+    if coords:
+        print(f"\n=== Search hospitals near Wardha ===")
+        results = search_nearby_facilities(coords[0], coords[1], radius_m=15000)
+        for r in results[:5]:
+            print(f"\n  {r['name']} ({r['facility_type']})")
+            print(f"    {r['address']} · {r['distance_km']} km")
+            print(f"    Phone: {r['phone'] or 'N/A'}")
+            print(f"    Maps:  {r['maps_url']}")
 
     print("\nRecommender module ready!")

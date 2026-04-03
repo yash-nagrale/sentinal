@@ -475,13 +475,8 @@ IMG_TFM = T.Compose([T.Resize((224,224)),T.ToTensor(),
 
 # ── Recommender widget ────────────────────────────────────────────────────────
 def show_recommender(diagnosis_key: str):
-    """Renders the full doctor recommender UI block."""
+    """Renders the full doctor recommender UI block (100% free, no API keys)."""
     import recommender as rec
-    # Always sync API key from session_state so sidebar changes take effect
-    live_key = st.session_state.get("api_key_value", "")
-    if live_key:
-        rec.GOOGLE_API_KEY = live_key
-    is_live = rec.GOOGLE_API_KEY != "YOUR_API_KEY_HERE"
 
     info    = rec.get_specialists_for_diagnosis(diagnosis_key)
     urgency = info["urgency_level"]
@@ -496,7 +491,7 @@ def show_recommender(diagnosis_key: str):
     # Specialist types for this diagnosis
     st.markdown("**Recommended specialist types for this diagnosis:**")
     spec_cols = st.columns(len(info["specialists"]))
-    for col, (name, _, _) in zip(spec_cols, info["specialists"]):
+    for col, name in zip(spec_cols, info["specialists"]):
         col.info(f"🩺 {name}")
 
     # ── Detect user location via IP (once per session) ──────────────────────
@@ -504,7 +499,7 @@ def show_recommender(diagnosis_key: str):
         st.session_state["_user_location"] = rec.detect_location()
     detected = st.session_state["_user_location"]
 
-    # Pre-fill location on first render for this diagnosis
+    # Pre-fill location on first render
     loc_key = f"loc_{diagnosis_key}"
     if loc_key not in st.session_state:
         if detected and detected["city"]:
@@ -513,12 +508,12 @@ def show_recommender(diagnosis_key: str):
             st.session_state[loc_key] = "Pune, Maharashtra"
 
     # ── Location input ────────────────────────────────────────────────────────
-    st.markdown("**Find nearest specialists:**")
+    st.markdown("**Find nearby hospitals & clinics:**")
     col_loc, col_btn = st.columns([3, 1])
     with col_loc:
         location_input = st.text_input(
             "Enter your city or location",
-            placeholder="e.g. Wardha, Pune, 411005, or any address",
+            placeholder="e.g. Wardha, Nagpur, 411005, or any address",
             key=loc_key,
             label_visibility="collapsed",
         )
@@ -526,127 +521,82 @@ def show_recommender(diagnosis_key: str):
         search_btn = st.button("🔍 Search", key=f"search_{diagnosis_key}",
                                use_container_width=True)
 
-    if not is_live:
-        st.caption("ℹ️ Demo mode — add a Google Places API key in the **sidebar** "
-                   "for live hospital results. Location search works without a key.")
-
-    # ── Resolve location ──────────────────────────────────────────────────────
     location_label = location_input.strip() if location_input else "Pune, Maharashtra"
 
     # Auto-search on first render; manual search via button afterwards
     first_load = f"results_{diagnosis_key}" not in st.session_state
 
     def _run_search():
-        """Geocode + search and store results in session state."""
         coords = rec.geocode_location(location_label)
         if coords is None:
             st.error(f"Could not find **{location_label}**. "
                      "Check the spelling and try again.")
             return False
-
-        all_results = {}
-        for name, ptype, keyword in info["specialists"]:
-            results = rec.search_nearby_doctors(
-                coords[0], coords[1], keyword,
-                place_type=ptype, radius_m=15000,
-            )
-            all_results[name] = results
-
-        st.session_state[f"results_{diagnosis_key}"]  = all_results
-        st.session_state[f"coords_{diagnosis_key}"]   = coords
-        st.session_state[f"loc_used_{diagnosis_key}"]  = location_label
+        facilities = rec.search_nearby_facilities(
+            coords[0], coords[1], radius_m=15000, max_results=10)
+        st.session_state[f"results_{diagnosis_key}"]   = facilities
+        st.session_state[f"coords_{diagnosis_key}"]    = coords
+        st.session_state[f"loc_used_{diagnosis_key}"]   = location_label
         return True
 
     if search_btn or first_load:
         _doc_ph = st.empty()
         with _doc_ph.container():
             shimmer_cards(3)
-        with st.spinner(f"Searching for specialists near {location_label}…"):
+        with st.spinner(f"Searching near {location_label}…"):
             ok = _run_search()
         _doc_ph.empty()
-
-        # Show API errors (e.g. wrong key, API not enabled)
-        if rec.last_api_error:
-            st.warning(rec.last_api_error)
         if ok is False:
             return
 
     # ── Display results ───────────────────────────────────────────────────────
-    all_results = st.session_state.get(f"results_{diagnosis_key}", {})
-    loc_used    = st.session_state.get(f"loc_used_{diagnosis_key}", location_label)
+    facilities = st.session_state.get(f"results_{diagnosis_key}", [])
+    loc_used   = st.session_state.get(f"loc_used_{diagnosis_key}", location_label)
 
-    if not all_results:
+    if not facilities:
+        if not first_load:
+            st.info(f"No hospitals or clinics found within 15 km of **{loc_used}**. "
+                    "Try a larger city nearby.")
         return
 
-    # Hint if location changed but results are stale
     if loc_used != location_label:
         st.caption(f"Showing results for **{loc_used}**. "
                    f"Click **Search** to update for **{location_label}**.")
 
-    tab_names = list(all_results.keys())
-    if not tab_names:
-        return
+    for i, fac in enumerate(facilities):
+        type_badge = {
+            "Hospital": '<span class="open-badge">Hospital</span>',
+            "Clinic":   '<span style="background:#DBEAFE;color:#1E40AF;padding:3px 10px;'
+                        'border-radius:10px;font-size:11px;font-weight:600">Clinic</span>',
+            "Doctor":   '<span style="background:#F3E8FF;color:#6B21A8;padding:3px 10px;'
+                        'border-radius:10px;font-size:11px;font-weight:600">Doctor</span>',
+        }.get(fac["facility_type"], "")
 
-    tabs = st.tabs([f"🩺 {n}" for n in tab_names])
-    for tab, spec_name in zip(tabs, tab_names):
-        with tab:
-            doctors = all_results[spec_name]
-            if not doctors:
-                st.info(f"No {spec_name} found within 15 km of {loc_used}.")
-                continue
+        phone_str = f"📞 {fac['phone']}" if fac.get("phone") else ""
+        web_str = ""
+        if fac.get("website"):
+            web_str = (f' · <a href="{fac["website"]}" target="_blank">'
+                       f'🌐 Website</a>')
+        hours_str = f"🕐 {fac['opening_hours']}" if fac.get("opening_hours") else ""
+        maps_link = (f'<a href="{fac["maps_url"]}" target="_blank">'
+                     f'📍 Open in Maps</a>')
+        dist_str = f"🚶 {fac['distance_km']} km away"
 
-            for i, doc in enumerate(doctors[:5]):
-                # Rating stars
-                rating    = doc.get("rating")
-                n_reviews = doc.get("user_ratings_total", 0)
-                stars_str = ""
-                if rating:
-                    full  = int(rating)
-                    half  = 1 if (rating - full) >= 0.5 else 0
-                    empty = 5 - full - half
-                    stars_str = ("★" * full + ("½" if half else "") + "☆" * empty)
-                    stars_str = (f'<span class="star">{stars_str}</span> '
-                                 f'{rating:.1f} ({n_reviews} reviews)')
-
-                open_now = doc.get("open_now")
-                if open_now is True:
-                    badge = '<span class="open-badge">● Open now</span>'
-                elif open_now is False:
-                    badge = '<span class="closed-badge">● Closed</span>'
-                else:
-                    badge = ""
-
-                phone_str = f"📞 {doc['phone']}" if doc.get("phone") else ""
-                maps_link = (f'<a href="{doc["maps_url"]}" target="_blank">'
-                             f'📍 Open in Maps</a>')
-                dist_str  = f"🚶 {doc['distance_km']} km away"
-
-                st.markdown(f"""
+        st.markdown(f"""
 <div class="doc-card">
-  <h4>#{i+1} &nbsp; {doc['name']} &nbsp; {badge}</h4>
-  <p>📌 {doc['address']}</p>
-  <p>{stars_str} &nbsp;&nbsp; {dist_str} &nbsp;&nbsp; {phone_str}</p>
-  <p>{maps_link}</p>
+  <h4>#{i+1} &nbsp; {fac['name']} &nbsp; {type_badge}</h4>
+  <p>📌 {fac['address']}</p>
+  <p>{dist_str} &nbsp;&nbsp; {phone_str} &nbsp;&nbsp; {hours_str}</p>
+  <p>{maps_link}{web_str}</p>
 </div>""", unsafe_allow_html=True)
 
-    # Quick map preview using st.map
+    # Map view
     try:
-        map_data = []
-        for spec_name, doctors in all_results.items():
-            for doc in doctors[:3]:
-                ml = doc.get("maps_url", "")
-                if "?q=" in ml:
-                    ll = ml.split("?q=")[1].split(",")
-                    if len(ll) == 2:
-                        try:
-                            map_data.append({"lat": float(ll[0]), "lon": float(ll[1]),
-                                             "name": doc["name"]})
-                        except ValueError:
-                            pass
+        map_data = [{"lat": f["lat"], "lon": f["lon"]}
+                    for f in facilities if f.get("lat") and f.get("lon")]
         if map_data:
             st.markdown("**Map view:**")
-            map_df = pd.DataFrame(map_data)
-            st.map(map_df, zoom=13)
+            st.map(pd.DataFrame(map_data), zoom=12)
     except Exception:
         pass
 
@@ -677,30 +627,14 @@ with st.sidebar:
         "🧠  Stroke Detector (PS5)",
     ], label_visibility="collapsed", key="nav_module")
     st.markdown("---")
-    st.markdown("#### Google Places API")
-    api_key_input = st.text_input("API Key (optional)", type="password",
-                                   placeholder="AIzaSy...",
-                                   help="Paste your Google Places API key for live doctor search")
-    if api_key_input:
-        st.session_state["api_key_value"] = api_key_input
-        import recommender as _rec
-        _rec.GOOGLE_API_KEY = api_key_input
-        os.environ["GOOGLE_PLACES_API_KEY"] = api_key_input
-        st.success("Live search enabled ✓")
-    elif "api_key_value" not in st.session_state:
-        st.caption("Demo mode — no API key")
-    st.markdown("---")
-
     # System status
     st.markdown("##### SYSTEM STATUS")
     _ollama_ok = _check_ollama()
-    _api_ok = "api_key_value" in st.session_state
     _gpu_ok = torch.cuda.is_available()
     _gpu_name = torch.cuda.get_device_name(0) if _gpu_ok else "CPU only"
     st.markdown(f'''
     <div class="status-row"><span>Compute</span><span style="font-size:11px;color:{'#10B981' if _gpu_ok else '#94A3B8'}">{_gpu_name}</span></div>
     <div class="status-row"><span>Ollama LLM</span><span class="{"sdot-green" if _ollama_ok else "sdot-red"}"></span></div>
-    <div class="status-row"><span>API Status</span><span class="{"sdot-green" if _api_ok else "sdot-red"}"></span></div>
     <div class="status-row"><span>System Health</span><span class="sdot-green"></span></div>
     ''', unsafe_allow_html=True)
     st.markdown("---")
