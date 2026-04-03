@@ -1,12 +1,6 @@
 
 import streamlit as st
-import pandas as pd
-import numpy as np
-import torch, pickle, os, sys, requests
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-from PIL import Image
-import torchvision.transforms as T
+import os, sys
 
 BASE   = os.path.dirname(os.path.abspath(__file__))
 SRC    = os.path.join(BASE, "src")
@@ -15,13 +9,46 @@ MODELS = os.path.join(BASE, "models")
 sys.path.insert(0, SRC)
 sys.path.insert(0, BASE)
 
-# ── Page config ───────────────────────────────────────────────────────────────
+# ── Page config (must be first Streamlit call) ────────────────────────────────
 st.set_page_config(
     page_title="SentinAl",
     page_icon="🛡",
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# ── Branded loading screen (visible while heavy imports load) ─────────────────
+_boot = st.empty()
+_boot.markdown('''
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+            padding:140px 0;text-align:center;font-family:Inter,system-ui,sans-serif">
+    <div style="font-size:52px;margin-bottom:12px">🛡</div>
+    <h2 style="margin:0;color:#0F172A;font-weight:800;letter-spacing:3px;font-size:26px">
+        SENTINAL</h2>
+    <p style="color:#64748B;margin:10px 0 0;font-size:14px">
+        Loading clinical AI models &amp; dependencies…</p>
+    <div style="width:180px;height:4px;background:#E2E8F0;border-radius:4px;
+                margin-top:24px;overflow:hidden">
+        <div style="width:100%;height:100%;border-radius:4px;
+                    background:linear-gradient(90deg,#0EA5E9,#06B6D4,#0EA5E9);
+                    background-size:200% 100%;
+                    animation:_boot_shimmer 1.2s ease-in-out infinite"></div>
+    </div>
+</div>
+<style>@keyframes _boot_shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}</style>
+''', unsafe_allow_html=True)
+
+# ── Heavy imports (deferred until after the loading screen is shown) ──────────
+import pandas as pd
+import numpy as np
+import torch, pickle, requests
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from PIL import Image
+import torchvision.transforms as T
+
+# ── Clear loading screen ──────────────────────────────────────────────────────
+_boot.empty()
 
 st.markdown("""
 <style>
@@ -301,6 +328,69 @@ def make_demo(risk="high"):
 
 # Best model for this project: qwen2.5:3b (1.9 GB, fits in RAM, medical-aware)
 OLLAMA_MODELS = ["qwen2.5:3b", "codellama:latest"]
+
+# Labels for CLIP zero-shot classification
+_FOOT_WOUND_LABELS = [
+    "a medical photograph of a foot wound or diabetic foot ulcer",
+    "a photograph of a healthy foot with no wound",
+    "a photograph of an animal or pet",
+    "a photograph of food or a meal",
+    "a photograph of a landscape, building, or scenery",
+    "a photograph of a person's face or portrait",
+    "a screenshot, diagram, or document",
+    "a random photograph not related to foot wounds",
+]
+_FOOT_WOUND_THRESHOLD = 0.25  # minimum probability for the foot-wound label
+
+
+@st.cache_resource
+def _load_clip():
+    """Load CLIP model and pre-compute text embeddings (labels never change)."""
+    from transformers import CLIPProcessor, CLIPModel
+    clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+    processor  = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+    clip_model.eval()
+
+    # Pre-compute text embeddings once — they're reused for every image
+    text_inputs = processor(text=_FOOT_WOUND_LABELS, return_tensors="pt", padding=True)
+    with torch.no_grad():
+        text_embeds = clip_model.get_text_features(**text_inputs)
+        text_embeds = text_embeds / text_embeds.norm(dim=-1, keepdim=True)
+
+    return clip_model, processor, text_embeds
+
+
+def validate_foot_wound_image(img) -> tuple:
+    """
+    Use CLIP zero-shot classification to check if the image is a foot wound.
+    Returns (is_valid: bool, message: str).
+    """
+    try:
+        clip_model, processor, text_embeds = _load_clip()
+    except Exception:
+        return True, "clip_unavailable"
+
+    # Only encode the image — text embeddings are already cached
+    image_inputs = processor(images=img, return_tensors="pt")
+    with torch.no_grad():
+        image_embeds = clip_model.get_image_features(**image_inputs)
+        image_embeds = image_embeds / image_embeds.norm(dim=-1, keepdim=True)
+        # CLIP logit scale
+        logit_scale = clip_model.logit_scale.exp()
+        logits = (image_embeds @ text_embeds.T) * logit_scale
+        probs = logits.softmax(dim=1)[0].cpu().numpy()
+
+    foot_wound_prob = float(probs[0])
+    best_idx = int(probs.argmax())
+    is_valid = best_idx == 0 or foot_wound_prob >= _FOOT_WOUND_THRESHOLD
+
+    if is_valid:
+        return True, f"Foot wound confidence: {foot_wound_prob*100:.1f}%"
+    else:
+        best_label = _FOOT_WOUND_LABELS[best_idx].replace("a photograph of ", "")
+        return False, (f"Image looks like {best_label} "
+                       f"(foot wound confidence: {foot_wound_prob*100:.1f}%)")
+
 
 def ask_ollama(prompt: str, model: str = "qwen2.5:3b") -> str:
     """
@@ -1051,8 +1141,9 @@ elif module.startswith("🦶"):
     with _ps1_placeholder.container():
         shimmer_metrics(2)
         shimmer_content(3)
-    with st.spinner("⚙️ Loading PS1 wound classifier…"):
+    with st.spinner("⚙️ Loading PS1 wound classifier & image validator…"):
         model = load_ps1()
+        _load_clip()          # pre-warm CLIP so first validation is instant
     _ps1_placeholder.empty()
     if model is None:
         st.error("PS1 model not found at models/best_ps1.pt"); st.stop()
@@ -1074,6 +1165,31 @@ elif module.startswith("🦶"):
         col_img, col_res = st.columns(2)
         with col_img:
             st.image(img, caption="Uploaded image", use_container_width=True)
+
+        # ── Validate: is this actually a foot wound image? ──────────────
+        file_id = f"{uploaded_img.name}_{uploaded_img.size}"
+        if st.session_state.get("ps1_validated_file") != file_id:
+            with st.spinner("🔍 Validating image — checking if this is a foot wound…"):
+                is_valid, val_msg = validate_foot_wound_image(img)
+            st.session_state["ps1_validated_file"] = file_id
+            st.session_state["ps1_valid"] = is_valid
+            st.session_state["ps1_val_msg"] = val_msg
+        is_valid = st.session_state["ps1_valid"]
+        val_msg  = st.session_state["ps1_val_msg"]
+
+        if val_msg == "clip_unavailable":
+            st.warning(
+                "⚠️ CLIP model could not be loaded for image validation. "
+                "Run: `pip install transformers` to enable it."
+            )
+        if not is_valid:
+            st.error(
+                "**Invalid image uploaded.** This does not appear to be a foot wound photograph.\n\n"
+                f"**Reason:** {val_msg}\n\n"
+                "Please upload a clear photograph of a diabetic foot wound for grading."
+            )
+            st.stop()
+        # ────────────────────────────────────────────────────────────────
 
         tensor = IMG_TFM(img).unsqueeze(0).to(DEVICE)
         with torch.no_grad():
