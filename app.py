@@ -499,32 +499,42 @@ def show_recommender(diagnosis_key: str):
         st.session_state["_user_location"] = rec.detect_location()
     detected = st.session_state["_user_location"]
 
-    # Pre-fill location on first render
-    loc_key = f"loc_{diagnosis_key}"
-    if loc_key not in st.session_state:
-        if detected and detected["city"]:
-            st.session_state[loc_key] = f"{detected['city']}, {detected['region']}"
-        else:
-            st.session_state[loc_key] = "Pune, Maharashtra"
+    # Build city list for the selectbox; detect default
+    city_names = list(rec.MAJOR_CITIES.keys())
+    default_city = "Pune, Maharashtra"
+    if detected and detected["city"]:
+        # Try to match detected city to a list entry
+        for c in city_names:
+            if detected["city"].lower() in c.lower():
+                default_city = c
+                break
+
+    # Pre-set selectbox default on first render
+    sel_key = f"city_sel_{diagnosis_key}"
+    if sel_key not in st.session_state:
+        st.session_state[sel_key] = default_city
 
     # ── Location input ────────────────────────────────────────────────────────
     st.markdown("**Find nearby hospitals & clinics:**")
-    col_loc, col_btn = st.columns([3, 1])
-    with col_loc:
-        location_input = st.text_input(
-            "Enter your city or location",
-            placeholder="e.g. Wardha, Nagpur, 411005, or any address",
-            key=loc_key,
-            label_visibility="collapsed",
-        )
-    with col_btn:
-        search_btn = st.button("🔍 Search", key=f"search_{diagnosis_key}",
-                               use_container_width=True)
+    selected_city = st.selectbox(
+        "Select a city (type to search)",
+        city_names,
+        key=sel_key,
+        label_visibility="collapsed",
+    )
+    custom_loc = st.text_input(
+        "Or type any location and press Enter:",
+        placeholder="e.g. Wardha, 411005, or any address",
+        key=f"custom_{diagnosis_key}",
+    )
 
-    location_label = location_input.strip() if location_input else "Pune, Maharashtra"
+    # Resolve: custom text overrides selectbox when filled
+    location_label = custom_loc.strip() if custom_loc and custom_loc.strip() else selected_city
 
-    # Auto-search on first render; manual search via button afterwards
-    first_load = f"results_{diagnosis_key}" not in st.session_state
+    # Auto-search when location changes or on first load
+    cached_loc   = st.session_state.get(f"loc_used_{diagnosis_key}", "")
+    first_load   = f"results_{diagnosis_key}" not in st.session_state
+    loc_changed  = location_label != cached_loc
 
     def _run_search():
         coords = rec.geocode_location(location_label)
@@ -539,7 +549,7 @@ def show_recommender(diagnosis_key: str):
         st.session_state[f"loc_used_{diagnosis_key}"]   = location_label
         return True
 
-    if search_btn or first_load:
+    if first_load or loc_changed:
         _doc_ph = st.empty()
         with _doc_ph.container():
             shimmer_cards(3)

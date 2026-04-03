@@ -56,39 +56,84 @@ URGENCY_MAP = {
     "ps5_normal":   ("🟢 Routine",   "Follow up with a neurologist if symptoms persist."),
 }
 
-# ── Major Indian cities — pre-known coordinates (instant lookup, no network) ──
+# ── Indian cities — pre-known coordinates (instant lookup, no network) ────────
+# Comprehensive list for selectbox autocomplete
 MAJOR_CITIES = {
-    "Pune, Maharashtra":                (18.5204, 73.8567),
+    # Metros
     "Mumbai, Maharashtra":              (19.0760, 72.8777),
     "Delhi":                            (28.6139, 77.2090),
     "Bangalore, Karnataka":             (12.9716, 77.5946),
     "Hyderabad, Telangana":             (17.3850, 78.4867),
     "Chennai, Tamil Nadu":              (13.0827, 80.2707),
     "Kolkata, West Bengal":             (22.5726, 88.3639),
+    "Pune, Maharashtra":                (18.5204, 73.8567),
     "Ahmedabad, Gujarat":              (23.0225, 72.5714),
+    # North India
     "Jaipur, Rajasthan":               (26.9124, 75.7873),
     "Lucknow, Uttar Pradesh":          (26.8467, 80.9462),
     "Chandigarh":                       (30.7333, 76.7794),
-    "Nagpur, Maharashtra":              (21.1458, 79.0882),
-    "Indore, Madhya Pradesh":           (22.7196, 75.8577),
-    "Bhopal, Madhya Pradesh":           (23.2599, 77.4126),
-    "Patna, Bihar":                     (25.6093, 85.1376),
-    "Coimbatore, Tamil Nadu":           (11.0168, 76.9558),
-    "Kochi, Kerala":                    (9.9312, 76.2673),
-    "Thiruvananthapuram, Kerala":       (8.5241, 76.9366),
-    "Visakhapatnam, Andhra Pradesh":    (17.6868, 83.2185),
-    "Guwahati, Assam":                  (26.1445, 91.7362),
+    "Noida, Uttar Pradesh":            (28.5355, 77.3910),
+    "Gurgaon, Haryana":                (28.4595, 77.0266),
+    "Dehradun, Uttarakhand":           (30.3165, 78.0322),
+    "Agra, Uttar Pradesh":             (27.1767, 78.0081),
+    "Varanasi, Uttar Pradesh":         (25.3176, 82.9739),
+    "Kanpur, Uttar Pradesh":           (26.4499, 80.3319),
+    "Prayagraj, Uttar Pradesh":        (25.4358, 81.8463),
+    "Amritsar, Punjab":                (31.6340, 74.8723),
+    "Ludhiana, Punjab":                (30.9010, 75.8573),
+    "Jalandhar, Punjab":               (31.3260, 75.5762),
+    "Shimla, Himachal Pradesh":        (31.1048, 77.1734),
+    "Jammu":                            (32.7266, 74.8570),
+    "Srinagar, Kashmir":               (34.0837, 74.7973),
+    "Meerut, Uttar Pradesh":           (28.9845, 77.7064),
+    "Jodhpur, Rajasthan":              (26.2389, 73.0243),
+    "Udaipur, Rajasthan":              (24.5854, 73.7125),
+    "Kota, Rajasthan":                 (25.2138, 75.8648),
+    # West India
     "Surat, Gujarat":                   (21.1702, 72.8311),
     "Vadodara, Gujarat":                (22.3072, 73.1812),
+    "Rajkot, Gujarat":                  (22.3039, 70.8022),
     "Nashik, Maharashtra":              (19.9975, 73.7898),
+    "Nagpur, Maharashtra":              (21.1458, 79.0882),
     "Aurangabad, Maharashtra":          (19.8762, 75.3433),
+    "Thane, Maharashtra":               (19.2183, 72.9781),
+    "Navi Mumbai, Maharashtra":         (19.0330, 73.0297),
+    "Kolhapur, Maharashtra":            (16.7050, 74.2433),
+    "Solapur, Maharashtra":             (17.6599, 75.9064),
+    "Amravati, Maharashtra":            (20.9374, 77.7796),
+    "Wardha, Maharashtra":              (20.7453, 78.6022),
+    "Sangli, Maharashtra":              (16.8524, 74.5815),
+    "Goa":                              (15.2993, 74.1240),
+    "Indore, Madhya Pradesh":           (22.7196, 75.8577),
+    "Bhopal, Madhya Pradesh":           (23.2599, 77.4126),
+    "Jabalpur, Madhya Pradesh":         (23.1815, 79.9864),
+    "Gwalior, Madhya Pradesh":          (26.2183, 78.1828),
+    # South India
+    "Coimbatore, Tamil Nadu":           (11.0168, 76.9558),
+    "Madurai, Tamil Nadu":              (9.9252, 78.1198),
+    "Tiruchirappalli, Tamil Nadu":      (10.7905, 78.7047),
+    "Salem, Tamil Nadu":                (11.6643, 78.1460),
+    "Kochi, Kerala":                    (9.9312, 76.2673),
+    "Thiruvananthapuram, Kerala":       (8.5241, 76.9366),
+    "Kozhikode, Kerala":                (11.2588, 75.7804),
+    "Thrissur, Kerala":                 (10.5276, 76.2144),
+    "Visakhapatnam, Andhra Pradesh":    (17.6868, 83.2185),
+    "Vijayawada, Andhra Pradesh":       (16.5062, 80.6480),
+    "Tirupati, Andhra Pradesh":         (13.6288, 79.4192),
     "Mysore, Karnataka":                (12.2958, 76.6394),
     "Mangalore, Karnataka":             (12.9141, 74.8560),
-    "Dehradun, Uttarakhand":            (30.3165, 78.0322),
+    "Hubli, Karnataka":                 (15.3647, 75.1240),
+    "Belgaum, Karnataka":               (15.8497, 74.4977),
+    # East India
+    "Patna, Bihar":                     (25.6093, 85.1376),
     "Ranchi, Jharkhand":                (23.3441, 85.3096),
-    "Raipur, Chhattisgarh":            (21.2514, 81.6296),
+    "Jamshedpur, Jharkhand":            (22.8046, 86.2029),
     "Bhubaneswar, Odisha":              (20.2961, 85.8245),
-    "Goa":                              (15.2993, 74.1240),
+    "Cuttack, Odisha":                  (20.4625, 85.8830),
+    "Guwahati, Assam":                  (26.1445, 91.7362),
+    "Raipur, Chhattisgarh":            (21.2514, 81.6296),
+    "Siliguri, West Bengal":            (26.7271, 88.3953),
+    "Durgapur, West Bengal":            (23.5204, 87.3119),
 }
 
 _OSM_HEADERS = {"User-Agent": "SentinAl/1.0 (medical-ai-app)"}
@@ -170,15 +215,27 @@ def search_nearby_facilities(lat, lng, radius_m=15000, max_results=10):
     Search for hospitals, clinics, and doctor offices near a location
     using the Overpass API (OpenStreetMap). Free, no API key.
 
-    Returns a list of dicts sorted by distance:
-        name, facility_type, address, distance_km, phone, website,
-        opening_hours, maps_url, lat, lon
+    Searches both `amenity` and `healthcare` tags for maximum coverage.
+    Retries with double radius if the first attempt finds nothing.
+
+    Returns a list of dicts sorted by distance.
     """
+    results = _overpass_search(lat, lng, radius_m, max_results)
+
+    # Retry with wider radius if nothing found
+    if not results and radius_m < 50000:
+        results = _overpass_search(lat, lng, radius_m * 2, max_results)
+
+    return results
+
+
+def _overpass_search(lat, lng, radius_m, max_results):
+    """Run a single Overpass query for medical facilities."""
     query = (
-        f'[out:json][timeout:20];'
+        f'[out:json][timeout:25];'
         f'('
-        f'  node["amenity"~"hospital|clinic|doctors"](around:{radius_m},{lat},{lng});'
-        f'  way["amenity"~"hospital|clinic|doctors"](around:{radius_m},{lat},{lng});'
+        f'  nwr["amenity"~"hospital|clinic|doctors"](around:{radius_m},{lat},{lng});'
+        f'  nwr["healthcare"~"hospital|clinic|doctor|centre|center"](around:{radius_m},{lat},{lng});'
         f');'
         f'out center;'
     )
@@ -188,7 +245,7 @@ def search_nearby_facilities(lat, lng, radius_m=15000, max_results=10):
             "https://overpass-api.de/api/interpreter",
             data={"data": query},
             headers=_OSM_HEADERS,
-            timeout=25,
+            timeout=30,
         )
         if r.status_code != 200:
             return []
@@ -204,7 +261,6 @@ def search_nearby_facilities(lat, lng, radius_m=15000, max_results=10):
                 continue
             seen.add(name.lower())
 
-            # Coordinates — nodes have lat/lon directly, ways have center
             el_lat = el.get("lat") or (el.get("center", {}).get("lat"))
             el_lng = el.get("lon") or (el.get("center", {}).get("lon"))
             if not el_lat or not el_lng:
@@ -214,18 +270,22 @@ def search_nearby_facilities(lat, lng, radius_m=15000, max_results=10):
 
             # Build address from addr:* tags
             addr_parts = []
-            for key in ("addr:street", "addr:city", "addr:postcode"):
+            for key in ("addr:street", "addr:city", "addr:postcode",
+                        "addr:district", "addr:state"):
                 val = tags.get(key)
                 if val:
                     addr_parts.append(val)
             address = ", ".join(addr_parts) if addr_parts else "Address not listed"
 
-            amenity = tags.get("amenity", "hospital")
+            # Determine facility type from amenity or healthcare tag
+            amenity = tags.get("amenity", "")
+            healthcare = tags.get("healthcare", "")
+            raw = amenity or healthcare or "hospital"
             type_label = {
-                "hospital": "Hospital",
-                "clinic":   "Clinic",
-                "doctors":  "Doctor",
-            }.get(amenity, "Medical")
+                "hospital": "Hospital", "clinic": "Clinic",
+                "doctors": "Doctor", "doctor": "Doctor",
+                "centre": "Medical Centre", "center": "Medical Centre",
+            }.get(raw, "Medical")
 
             results.append({
                 "name":          name,
