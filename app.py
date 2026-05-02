@@ -1,6 +1,7 @@
 
 import streamlit as st
 import os, sys
+import subprocess
 
 BASE   = os.path.dirname(os.path.abspath(__file__))
 SRC    = os.path.join(BASE, "src")
@@ -16,6 +17,32 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+@st.cache_resource
+def start_ollama_serve():
+    """Starts Ollama serve in the background if it's not already running."""
+    import requests
+    try:
+        # Check if Ollama is already running
+        requests.get("http://localhost:11434/", timeout=1)
+        return "Already running"
+    except Exception:
+        pass
+        
+    try:
+        # If not running, start it
+        process = subprocess.Popen(
+            ["ollama", "serve"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+        )
+        return process
+    except Exception:
+        return None
+
+# Start Ollama serve silently when the app loads
+start_ollama_serve()
 
 # ── Branded loading screen (visible while heavy imports load) ─────────────────
 _boot = st.empty()
@@ -652,472 +679,30 @@ with st.sidebar:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# OVERVIEW
+# ROUTING
 # ══════════════════════════════════════════════════════════════════════════════
+from src.ui.home_ui import render_home_page
+from src.ui.ps2_ui import render_ps2_page
+from src.ui.ps1_ui import render_ps1_page
+from src.ui.ps5_ui import render_ps5_page
+from src.ui.components_ui import shimmer_metrics, shimmer_content, shimmer_chart
+
 if module.startswith("🏠"):
-    # ── Hero ──────────────────────────────────────────────────────────────────
-    st.markdown('''
-    <div style="margin-bottom:8px">
-        <h1 style="font-size:34px;font-weight:800;color:#0F172A;margin:0">
-            Sentin<span style="color:#0EA5E9">Al</span>
-        </h1>
-        <p style="font-size:14px;color:#64748B;margin:6px 0 0">
-            Unified Clinical AI Platform &mdash; Privacy-first edge AI &middot;
-            all models run locally &middot; zero cloud data transfer
-        </p>
-    </div>''', unsafe_allow_html=True)
+    render_home_page()
 
-    # ── Metric cards ──────────────────────────────────────────────────────────
-    st.markdown('''
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin:24px 0 32px">
-      <div class="metric-card mc-ps2">
-        <div class="label">PS2 AUROC</div>
-        <div class="value">0.9960</div>
-        <div class="badge">&#8599; Optimal Range</div>
-      </div>
-      <div class="metric-card mc-ps1">
-        <div class="label">PS1 Accuracy</div>
-        <div class="value">97.05%</div>
-        <div class="badge">&#9673; High Precision</div>
-      </div>
-      <div class="metric-card mc-ps5">
-        <div class="label">PS5 AUROC</div>
-        <div class="value">0.982</div>
-        <div class="badge">&#10022; State of the Art</div>
-      </div>
-      <div class="metric-card mc-modules">
-        <div class="label">Active Modules</div>
-        <div class="value">4</div>
-        <div class="badge">&#10022; Unified Stream</div>
-      </div>
-    </div>''', unsafe_allow_html=True)
-
-    # ── Module cards (clickable — each card is an <a> link) ─────────────────
-    st.markdown('''
-    <style>.card-link{text-decoration:none!important;color:inherit!important;display:block}</style>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:28px">
-      <a class="card-link" href="?nav=ps2">
-        <div class="module-card mc-vital">
-          <span class="tag">PS2</span>
-          <div class="icon">&#128200;</div>
-          <h3>Vital Sign Monitor</h3>
-          <div class="desc">Continuous clinical monitoring with advanced arrhythmia detection and early warning score integration.</div>
-          <div class="metrics">
-            <div class="metric-item"><div class="mlabel">AUROC</div><div class="mval">0.9960</div></div>
-            <div class="metric-item"><div class="mlabel">Sensitivity</div><div class="mval">88.9%</div></div>
-          </div>
-        </div>
-      </a>
-      <a class="card-link" href="?nav=ps5">
-        <div class="module-card mc-stroke">
-          <span class="tag">PS5</span>
-          <div class="icon">&#129504;</div>
-          <h3>CT Stroke Detector</h3>
-          <div class="desc">Automated identification of acute ischemic and hemorrhagic strokes from non-contrast CT scans.</div>
-          <div class="metrics">
-            <div class="metric-item"><div class="mlabel">AUROC</div><div class="mval">0.982</div></div>
-            <div class="metric-item"><div class="mlabel">Accuracy</div><div class="mval">92.2%</div></div>
-          </div>
-        </div>
-      </a>
-      <a class="card-link" href="?nav=ps1">
-        <div class="module-card mc-wound">
-          <span class="tag">PS1</span>
-          <div class="icon">&#129470;</div>
-          <h3>Foot Wound Grader</h3>
-          <div class="desc">Deep learning assessment of diabetic foot ulcers with precise classification of wound severity stages.</div>
-          <div class="metrics">
-            <div class="metric-item"><div class="mlabel">Accuracy</div><div class="mval">97.05%</div></div>
-            <div class="metric-item"><div class="mlabel">F1 Macro</div><div class="mval">0.97</div></div>
-          </div>
-        </div>
-      </a>
-    </div>''', unsafe_allow_html=True)
-
-    # ── Specialist recommender banner ─────────────────────────────────────────
-    st.markdown('''
-    <div class="recommender-card">
-      <div class="rec-icon">&#128154;</div>
-      <div class="rec-info">
-        <h3>Specialist Recommender</h3>
-        <div class="rec-desc">
-          Integrates multi-modal data from all modules to suggest optimal
-          clinical intervention paths and specialist referrals.
-        </div>
-      </div>
-      <div class="rec-right">
-        <div class="rec-badge-box">
-          <div class="rb-label">Coverage Scope</div>
-          <div class="rb-value">Covers all 3<br>diagnosis types</div>
-        </div>
-      </div>
-    </div>''', unsafe_allow_html=True)
-
-    # ── Performance summary table ─────────────────────────────────────────────
-    st.markdown('''
-    <div style="margin-top:36px">
-      <div class="perf-header">
-        <div>
-          <h2>Model Performance Summary</h2>
-          <p class="ph-sub">Comparative metrics across all deployed AI modules</p>
-        </div>
-      </div>
-      <table class="perf-table">
-        <thead><tr>
-          <th>Module</th><th>Architecture</th><th>Dataset</th>
-          <th>AUROC / Acc</th><th>Sensitivity</th><th>Status</th>
-        </tr></thead>
-        <tbody>
-          <tr>
-            <td><span class="model-badge badge-ps2">PS2</span></td>
-            <td>Temporal Transformer (d=128, 8 heads, 3 layers)</td>
-            <td>293,248 rows &times; 22 cols</td>
-            <td>AUROC 0.9960</td><td>88.9%</td>
-            <td><span class="perf-status"><span class="perf-status-dot"></span> ACTIVE</span></td>
-          </tr>
-          <tr>
-            <td><span class="model-badge badge-ps1">PS1</span></td>
-            <td>EfficientNet-B0 (4.3M params, fine-tuned)</td>
-            <td>9,934 images, 4 grades</td>
-            <td>Acc 97.05%</td><td>97% (macro)</td>
-            <td><span class="perf-status"><span class="perf-status-dot"></span> ACTIVE</span></td>
-          </tr>
-          <tr>
-            <td><span class="model-badge badge-ps5">PS5</span></td>
-            <td>EfficientNet-B0 (4.3M params, fine-tuned)</td>
-            <td>2,501 CT scans, 2 classes</td>
-            <td>AUROC 0.982</td><td>87% (stroke)</td>
-            <td><span class="perf-status"><span class="perf-status-dot"></span> ACTIVE</span></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>''', unsafe_allow_html=True)
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# PS2 — VITAL SIGNS
-# ══════════════════════════════════════════════════════════════════════════════
 elif module.startswith("📈"):
-    import plotly.graph_objects as go
-    from plotly.subplots import make_subplots
-    st.title("💓 Vital Sign Monitor — Deterioration Early Warning")
-    st.caption("Temporal Transformer · 12-hour prediction window · AUROC 0.9960")
-
     # Show shimmer while model loads (first time only — cached after)
     _ps2_placeholder = st.empty()
     with _ps2_placeholder.container():
         shimmer_metrics()
         shimmer_chart()
     with st.spinner("⚙️ Loading PS2 Temporal Transformer…"):
-        tf_model,scaler,encoders,feat_cols,threshold = load_ps2()
+        tf_model, scaler, encoders, feat_cols, threshold = load_ps2()
     _ps2_placeholder.empty()
-    if tf_model is None:
-        st.error("PS2 model not loaded. Run preprocess.py → train.py first.")
-        st.stop()
+    
+    render_ps2_page(tf_model, scaler, encoders, feat_cols, threshold, ollama_ui, show_recommender)
 
-    st.markdown("### Load patient data")
-    c1,c2 = st.columns(2)
-    with c1:
-        demo_opt = st.selectbox("Demo patient", ["None","High risk (48h escalating)","Moderate risk (48h mild trend)"])
-    with c2:
-        uploaded = st.file_uploader("Or upload patient CSV", type="csv")
-
-    df_patient = None
-    if uploaded:
-        df_patient = pd.read_csv(uploaded); st.success(f"Loaded {len(df_patient)} rows")
-    elif "High" in demo_opt:
-        df_patient = make_demo("high"); st.info("Demo: HIGH-risk patient — 48 hours of escalating vitals")
-    elif "Moderate" in demo_opt:
-        df_patient = make_demo("moderate"); st.info("Demo: MODERATE-risk patient")
-
-    if df_patient is None:
-        st.markdown("Select a demo patient or upload a CSV to begin.")
-        st.stop()
-
-    _assess_ph = st.empty()
-    with _assess_ph.container():
-        shimmer_metrics()
-        shimmer_chart()
-        shimmer_content(2)
-    with st.spinner("Running AI risk assessment…"):
-        df_proc = ps2_preprocess(df_patient, scaler, encoders, feat_cols)
-        scores  = ps2_score(df_proc, feat_cols, tf_model)
-    _assess_ph.empty()
-
-    latest_risk = float(np.nanmax(scores[-6:]))
-    risk_level  = "HIGH" if latest_risk>=threshold else "MODERATE" if latest_risk>=0.35 else "LOW"
-    css         = "risk-high" if risk_level=="HIGH" else "risk-mod" if risk_level=="MODERATE" else "risk-low"
-    hours       = df_patient["hour_from_admission"].values
-    latest      = df_patient.iloc[-1]
-
-    h1,h2,h3,h4 = st.columns(4)
-    h1.metric("Risk score",   f"{latest_risk*100:.0f} / 100")
-    h2.metric("Alert level",  risk_level)
-    h3.metric("Heart rate",   f"{latest['heart_rate']:.0f} bpm",
-              delta=f"{latest['heart_rate']-84:.0f}")
-    h4.metric("SpO₂",         f"{latest['spo2_pct']:.1f}%",
-              delta=f"{latest['spo2_pct']-95:.1f}%", delta_color="inverse")
-
-    st.markdown(f'<div class="{css}"><strong>{risk_level} RISK</strong> — score {latest_risk*100:.0f}/100 (threshold {threshold:.3f})</div>',
-                unsafe_allow_html=True)
-
-    # Charts
-    st.markdown("### Vital sign trends")
-    fig = make_subplots(rows=2,cols=3,
-        subplot_titles=("Deterioration risk","Heart rate & SpO₂","Blood pressure",
-                        "Respiratory rate","Lactate & CRP","Nurse alerts"))
-    valid = ~np.isnan(scores)
-    fig.add_trace(go.Scatter(x=hours[valid],y=scores[valid]*100,mode="lines",
-        name="Risk",line=dict(color="#E24B4A",width=2.5)),row=1,col=1)
-    fig.add_hline(y=threshold*100,line_dash="dash",line_color="black",row=1,col=1)
-    fig.add_trace(go.Scatter(x=hours,y=df_patient["heart_rate"],name="HR",
-        line=dict(color="#E24B4A")),row=1,col=2)
-    fig.add_trace(go.Scatter(x=hours,y=df_patient["spo2_pct"],name="SpO₂",
-        line=dict(color="#185FA5")),row=1,col=2)
-    fig.add_hline(y=94,line_dash="dot",line_color="#185FA5",row=1,col=2)
-    fig.add_trace(go.Scatter(x=hours,y=df_patient["systolic_bp"],name="Systolic",
-        line=dict(color="#534AB7")),row=1,col=3)
-    fig.add_trace(go.Scatter(x=hours,y=df_patient["diastolic_bp"],name="Diastolic",
-        line=dict(color="#AFA9EC")),row=1,col=3)
-    fig.add_trace(go.Scatter(x=hours,y=df_patient["respiratory_rate"],name="RR",
-        line=dict(color="#EF9F27")),row=2,col=1)
-    fig.add_hline(y=20,line_dash="dot",line_color="#EF9F27",row=2,col=1)
-    fig.add_trace(go.Scatter(x=hours,y=df_patient["lactate"],name="Lactate",
-        line=dict(color="#993C1D")),row=2,col=2)
-    fig.add_hline(y=2.0,line_dash="dot",line_color="#993C1D",row=2,col=2)
-    fig.add_trace(go.Scatter(x=hours,y=df_patient["crp_level"],name="CRP",
-        line=dict(color="#D4537E")),row=2,col=2)
-    fig.add_trace(go.Bar(x=hours,y=df_patient["nurse_alert"],name="Nurse alert",
-        marker_color="#EF9F27"),row=2,col=3)
-    fig.update_layout(height=500,showlegend=True,template="plotly_white",
-                      legend=dict(orientation="h",y=-0.15))
-    st.plotly_chart(fig, use_container_width=True)
-
-    # Alert log
-    alert_hrs = hours[valid][scores[valid]>=threshold]
-    if len(alert_hrs)>0:
-        st.markdown("### Alert log")
-        for h in alert_hrs[-5:][::-1]:
-            idx  = int(np.where(hours==h)[0][0])
-            row  = df_patient.iloc[idx]
-            rsco = float(scores[idx])
-            lvl  = "HIGH" if rsco>=threshold else "MODERATE"
-            c    = "risk-high" if lvl=="HIGH" else "risk-mod"
-            st.markdown(f'<div class="{c}"><strong>Hour {int(h)}</strong> — '
-                        f'Score: {rsco*100:.0f}/100 | HR: {row.heart_rate:.0f} | '
-                        f'SpO₂: {row.spo2_pct:.1f}% | RR: {row.respiratory_rate:.0f} | '
-                        f'BP: {row.systolic_bp:.0f}/{row.diastolic_bp:.0f}</div>',
-                        unsafe_allow_html=True)
-
-    # ── EDA & Model Architecture tabs (mentor requirement) ──────────────────
-    st.markdown("---")
-    eda_tab, arch_tab = st.tabs(["📊  Data Exploration (EDA)", "🏗️  Model Architecture & Config"])
-
-    with eda_tab:
-        st.markdown("#### Exploratory Data Analysis — PS2 Dataset")
-        st.caption("293,248 rows · 7,000 patients · 22 columns · 5.4% deterioration rate")
-
-        ec1, ec2 = st.columns(2)
-        with ec1:
-            # Class distribution
-            fig_cls = go.Figure(go.Bar(
-                x=["Stable (0)", "Deteriorating (1)"],
-                y=[277398, 15850],
-                marker_color=["#0EA5E9", "#EF4444"],
-                text=["277,398 (94.6%)", "15,850 (5.4%)"],
-                textposition="outside",
-            ))
-            fig_cls.update_layout(title="Class Distribution — Severe Imbalance 94.6:5.4",
-                                  height=300, template="plotly_white",
-                                  yaxis_title="Record count", margin=dict(t=40,b=10))
-            st.plotly_chart(fig_cls, use_container_width=True)
-
-        with ec2:
-            # Feature group importance
-            fig_feat = go.Figure(go.Bar(
-                x=["Lactate", "SpO2 trend", "Shock index", "qSOFA", "RR trend",
-                   "HR trend", "MAP", "CRP", "Pulse pressure", "Temp"],
-                y=[0.142, 0.118, 0.097, 0.089, 0.083, 0.076, 0.071, 0.065, 0.058, 0.051],
-                marker_color="#0EA5E9",
-                orientation="v",
-            ))
-            fig_feat.update_layout(title="Top 10 Most Informative Features (by gradient magnitude)",
-                                   height=300, template="plotly_white",
-                                   yaxis_title="Relative importance", margin=dict(t=40,b=10))
-            st.plotly_chart(fig_feat, use_container_width=True)
-
-        ec3, ec4 = st.columns(2)
-        with ec3:
-            # Vital sign distributions: stable vs deteriorating
-            hrs = list(range(48))
-            stable_hr   = [80 + 2*np.sin(h/6) + np.random.normal(0,1) for h in hrs]
-            deterio_hr  = [78 + h*0.6 + np.random.normal(0,2) for h in hrs]
-            fig_hr = go.Figure()
-            fig_hr.add_trace(go.Scatter(x=hrs, y=stable_hr, name="Stable patient",
-                                        line=dict(color="#0EA5E9", width=2)))
-            fig_hr.add_trace(go.Scatter(x=hrs, y=deterio_hr, name="Deteriorating patient",
-                                        line=dict(color="#EF4444", width=2)))
-            fig_hr.update_layout(title="Heart Rate — Stable vs Deteriorating Pattern",
-                                 height=280, template="plotly_white",
-                                 xaxis_title="Hour from admission",
-                                 yaxis_title="Heart rate (bpm)", margin=dict(t=40,b=10))
-            st.plotly_chart(fig_hr, use_container_width=True)
-
-        with ec4:
-            # Risk score distribution
-            rng2 = np.random.default_rng(99)
-            stable_scores   = rng2.beta(1.5, 8, 1000) * 100
-            deterio_scores  = rng2.beta(6, 2, 200) * 100
-            fig_dist = go.Figure()
-            fig_dist.add_trace(go.Histogram(x=stable_scores, name="Stable",
-                                            marker_color="#0EA5E9", opacity=0.7,
-                                            xbins=dict(size=5)))
-            fig_dist.add_trace(go.Histogram(x=deterio_scores, name="Deteriorating",
-                                            marker_color="#EF4444", opacity=0.7,
-                                            xbins=dict(size=5)))
-            fig_dist.add_vline(x=84.1, line_dash="dash", line_color="black",
-                               annotation_text="Threshold 0.841")
-            fig_dist.update_layout(title="Risk Score Distribution by Class",
-                                   barmode="overlay", height=280, template="plotly_white",
-                                   xaxis_title="Risk score (0-100)",
-                                   margin=dict(t=40,b=10))
-            st.plotly_chart(fig_dist, use_container_width=True)
-
-        # Dataset stats summary
-        st.markdown("**Dataset statistics:**")
-        ds1, ds2, ds3, ds4 = st.columns(4)
-        ds1.metric("Total rows",      "293,248")
-        ds2.metric("Patients",        "7,000 train / 1,500 val")
-        ds3.metric("Features (raw)",  "22 columns")
-        ds4.metric("Features (engineered)", "34 temporal + 4 static")
-
-    with arch_tab:
-        st.markdown("#### PS2 — Temporal Transformer Architecture")
-        st.caption("Mentor requirement: layers, configuration, complexity")
-
-        # Model config table
-        st.markdown("**Hyperparameters & Configuration:**")
-        arch_data = {
-            "Parameter": [
-                "Architecture", "Input shape", "d_model (embedding dim)",
-                "Attention heads (nhead)", "Encoder layers", "FFN dim (dim_feedforward)",
-                "Dropout", "Positional encoding", "Static encoder",
-                "Fusion", "Classifier head", "Output activation",
-                "Total parameters", "Trainable parameters"
-            ],
-            "Value": [
-                "Temporal Transformer + BiLSTM (ensemble)",
-                "(batch, 12 hours, 34 features)",
-                "128",
-                "8 (each head dim = 16)",
-                "3 TransformerEncoderLayer blocks",
-                "256 units",
-                "0.2 (temporal) + 0.2 (classifier)",
-                "Learned embeddings over 72 max positions",
-                "Linear(4→64) → GELU → Linear(64→32)",
-                "Attention pool → concat static → MLP",
-                "Linear(160→128) → LayerNorm → GELU → Linear(128→1)",
-                "Sigmoid → probability 0–1",
-                "434,146",
-                "434,146 (trained from scratch)"
-            ],
-            "Why this choice": [
-                "Self-attention allows any hour to attend any other hour directly",
-                "12h history × 34 clinical features per hour",
-                "128 balances capacity vs overfitting on 216K windows",
-                "8 heads learn 8 different temporal relationship patterns",
-                "3 layers sufficient; more risked overfitting",
-                "2× d_model — standard Transformer ratio",
-                "Regularisation — prevents overfitting on minority class",
-                "Encodes hour order information",
-                "Encodes age, comorbidity, gender, admission type",
-                "Temporal context + patient profile merged before decision",
-                "LayerNorm stabilises gradient flow in final layers",
-                "Outputs probability for Focal Loss (binary)",
-                "Lightweight vs ResNet50 (25M) or BERT (110M)",
-                "No pretrained weights — trained on hackathon data only"
-            ]
-        }
-        st.dataframe(pd.DataFrame(arch_data), use_container_width=True, hide_index=True)
-
-        st.markdown("**Training configuration:**")
-        tc1, tc2, tc3 = st.columns(3)
-        with tc1:
-            st.markdown("""
-**Optimiser:** AdamW  
-**Learning rate:** 3e-4  
-**Weight decay:** 1e-4  
-**Scheduler:** CosineAnnealingLR  
-**Batch size:** 256  
-""")
-        with tc2:
-            st.markdown("""
-**Loss function:** Focal Loss  
-**Alpha:** 0.75 (class weight)  
-**Gamma:** 2.0 (focus rate)  
-**Sampler:** WeightedRandomSampler  
-**Early stopping patience:** 8  
-""")
-        with tc3:
-            st.markdown("""
-**Epochs trained:** 59  
-**Best epoch:** 51  
-**Training windows:** 216,248  
-**Val windows:** ~46,000  
-**Seed:** 42  
-""")
-
-        st.markdown("**Overfitting controls:**")
-        ov1, ov2 = st.columns(2)
-        with ov1:
-            st.info("""**"What caused initial overfitting:**
-BiLSTM train acc 97% vs val acc 67% — the original validation set had only 40 Grade-3 images, making val accuracy meaningless. The model memorised training patterns.""")
-        with ov2:
-            st.success("""**How we fixed it:**
-Re-split 85/15 stratified by patient ID · Dropout 0.5 · Weight decay 5e-4 · Focal Loss prevents majority-class memorisation · CosineAnnealingLR prevents oscillation near optimum""")
-
-        st.markdown("**Why Transformer over LSTM:**")
-        st.markdown("""
-| | LSTM | Temporal Transformer |
-|---|---|---|
-| Cross-hour dependency | Sequential — diluted over 10 steps | Direct attention — any hour to any hour |
-| Minority class learning | Dominated by stable examples | Focal Loss + attention focuses on hard cases |
-| Parallelism | Sequential (slow training) | Parallel attention (faster GPU utilisation) |
-| Interpretability | Hidden state (black box) | Attention weights (partially interpretable) |
-| Parameters | ~1.2M (BiLSTM) | 434K (Transformer) — more efficient |
-""")
-
-    # ── Clinical explanation + chatbot ─────────────────────────────────────────
-    # Clinical explanation + chatbot
-    ps2_prompt = (
-        f"You are a clinical assistant. An AI has flagged a patient for possible deterioration.\n\n"
-        f"Current vitals:\n"
-        f"- Heart rate: {latest['heart_rate']:.0f} bpm (normal 60-100)\n"
-        f"- Respiratory rate: {latest['respiratory_rate']:.0f} /min (normal 12-20)\n"
-        f"- SpO2: {latest['spo2_pct']:.1f}% (normal >=94%)\n"
-        f"- Systolic BP: {latest['systolic_bp']:.0f} mmHg\n"
-        f"- Lactate: {latest['lactate']:.2f} mmol/L (normal <2.0)\n"
-        f"- CRP: {latest['crp_level']:.1f} mg/L (normal <10)\n"
-        f"- Nurse alert: {'Yes' if latest['nurse_alert'] else 'No'}\n\n"
-        f"AI deterioration risk: {latest_risk*100:.0f}/100 — {risk_level} RISK\n\n"
-        f"In 3-4 sentences tell a non-specialist caregiver: which vitals are concerning, "
-        f"what clinical pattern this suggests, and what immediate action to take. "
-        f"Avoid jargon."
-    )
-    ollama_ui(ps2_prompt, "ps2")
-
-    # Recommender
-    diag_key = f"ps2_{risk_level.lower()}"
-    show_recommender(diag_key)
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# PS1 — FOOT WOUND
-# ══════════════════════════════════════════════════════════════════════════════
 elif module.startswith("🦶"):
-    st.title("🦶 Foot Wound Grader — Diabetic Ulcer Classification")
-    st.caption("EfficientNet-B0 · Wagner Grade 1–4 · Accuracy 97.05%")
-
     _ps1_placeholder = st.empty()
     with _ps1_placeholder.container():
         shimmer_metrics(2)
@@ -1125,113 +710,10 @@ elif module.startswith("🦶"):
     with st.spinner("⚙️ Loading PS1 wound classifier…"):
         model = load_ps1()
     _ps1_placeholder.empty()
-    if model is None:
-        st.error("PS1 model not found at models/best_ps1.pt"); st.stop()
+    
+    render_ps1_page(model, validate_foot_wound_image, ollama_ui, show_recommender, shimmer_metrics, shimmer_content)
 
-    GRADE_INFO = {
-        0: ("Grade 1","Superficial wound (skin only)","low",
-            "Monitor and offload pressure. Podiatry review recommended."),
-        1: ("Grade 2","Deep wound to tendon or joint capsule","moderate",
-            "Refer to podiatry/diabetology within 1 week."),
-        2: ("Grade 3","Deep wound with abscess or osteomyelitis","high",
-            "Urgent surgical review required within 24 hours."),
-        3: ("Grade 4","Partial foot gangrene","high",
-            "Immediate vascular surgery referral — amputation risk."),
-    }
-
-    uploaded_img = st.file_uploader("Upload foot wound photograph", type=["jpg","jpeg","png"])
-    if uploaded_img:
-        img = Image.open(uploaded_img).convert("RGB")
-        col_img, col_res = st.columns(2)
-        with col_img:
-            st.image(img, caption="Uploaded image", use_container_width=True)
-
-        # ── Validate: is this actually a foot wound image? ──────────────
-        file_id = f"{uploaded_img.name}_{uploaded_img.size}"
-        if st.session_state.get("ps1_validated_file") != file_id:
-            with st.spinner("🔍 Validating image — checking if this is a foot wound…"):
-                is_valid, val_msg = validate_foot_wound_image(img)
-            st.session_state["ps1_validated_file"] = file_id
-            st.session_state["ps1_valid"] = is_valid
-            st.session_state["ps1_val_msg"] = val_msg
-        is_valid = st.session_state["ps1_valid"]
-        val_msg  = st.session_state["ps1_val_msg"]
-
-        if val_msg == "clip_unavailable":
-            st.warning(
-                "⚠️ CLIP model could not be loaded for image validation. "
-                "Run: `pip install transformers` to enable it."
-            )
-        if not is_valid:
-            st.error(
-                "**Invalid image uploaded.** This does not appear to be a foot wound photograph.\n\n"
-                f"**Reason:** {val_msg}\n\n"
-                "Please upload a clear photograph of a diabetic foot wound for grading."
-            )
-            st.stop()
-        # ────────────────────────────────────────────────────────────────
-
-        tensor = IMG_TFM(img).unsqueeze(0).to(DEVICE)
-        with torch.no_grad():
-            probs = torch.softmax(model(tensor),dim=1)[0].cpu().numpy()
-        pred = int(probs.argmax()); conf = float(probs[pred])*100
-        g_name,g_desc,g_risk,g_action = GRADE_INFO[pred]
-
-        with col_res:
-            css = "risk-high" if g_risk=="high" else "risk-mod" if g_risk=="moderate" else "risk-low"
-            st.markdown(f'<div class="{css}"><strong>{g_name} — {g_desc}</strong><br>'
-                        f'Confidence: {conf:.1f}%<br>Action: {g_action}</div>',
-                        unsafe_allow_html=True)
-            st.markdown("**Grade probabilities:**")
-            for i,(g,p) in enumerate(zip(["Grade 1","Grade 2","Grade 3","Grade 4"],probs)):
-                bc = "#E24B4A" if i==pred else "#B4B2A9"
-                st.markdown(f'<div style="display:flex;align-items:center;gap:8px;margin:4px 0;font-size:13px">'
-                            f'<span style="min-width:58px">{g}</span>'
-                            f'<div style="flex:1;background:#e0e0e0;border-radius:4px;height:12px">'
-                            f'<div style="width:{p*100:.1f}%;background:{bc};height:12px;border-radius:4px"></div>'
-                            f'</div><span>{p*100:.1f}%</span></div>', unsafe_allow_html=True)
-
-        # Clinical explanation + chatbot
-        ps1_prompt = (
-            f"You are a clinical assistant helping a caregiver understand a diabetic foot wound result.\n\n"
-            f"AI wound classification:\n"
-            f"- Grade: {g_name} ({g_desc})\n"
-            f"- Confidence: {conf:.1f}%\n"
-            f"- Recommended action: {g_action}\n"
-            f"- Grade probabilities: Grade 1 {probs[0]*100:.1f}%, Grade 2 {probs[1]*100:.1f}%, "
-            f"Grade 3 {probs[2]*100:.1f}%, Grade 4 {probs[3]*100:.1f}%\n\n"
-            f"In 3-4 sentences explain: what this wound grade means, "
-            f"the risks if untreated, and what the caregiver should do next. "
-            f"Use simple non-medical language."
-        )
-        ollama_ui(ps1_prompt, "ps1")
-
-        # Recommender
-        show_recommender(f"ps1_grade{pred+1}")
-    else:
-        st.info("Upload a foot wound photograph to classify its Wagner grade.")
-        col_a, col_b = st.columns(2)
-        with col_a:
-            st.markdown("**What this model does:**")
-            for g,d in [("Grade 1","Superficial — skin only"),
-                        ("Grade 2","Deep — tendon/capsule"),
-                        ("Grade 3","Deep + abscess/infection"),
-                        ("Grade 4","Partial gangrene")]:
-                st.markdown(f"- **{g}**: {d}")
-        with col_b:
-            st.markdown("**Model performance:**")
-            st.metric("Validation accuracy","97.05%")
-            st.metric("F1 macro","0.97")
-            st.metric("Training epochs","27")
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# PS5 — CT STROKE
-# ══════════════════════════════════════════════════════════════════════════════
 elif module.startswith("🧠"):
-    st.title("🧠 CT Stroke Detector — Hemorrhage Detection")
-    st.caption("EfficientNet-B0 · Normal vs Stroke · AUROC 0.982 · Val Accuracy 92.2%")
-
     _ps5_placeholder = st.empty()
     with _ps5_placeholder.container():
         shimmer_metrics(2)
@@ -1239,71 +721,8 @@ elif module.startswith("🧠"):
     with st.spinner("⚙️ Loading PS5 stroke detector…"):
         model = load_ps5()
     _ps5_placeholder.empty()
-    if model is None:
-        st.error("PS5 model not found at models/best_ps5_classifier.pt"); st.stop()
-
-    uploaded_ct = st.file_uploader("Upload brain CT scan image", type=["jpg","jpeg","png"])
-    if uploaded_ct:
-        img = Image.open(uploaded_ct).convert("RGB")
-        col_img, col_res = st.columns(2)
-        with col_img:
-            st.image(img, caption="Brain CT scan", use_container_width=True)
-
-        tensor = IMG_TFM(img).unsqueeze(0).to(DEVICE)
-        with torch.no_grad():
-            probs = torch.softmax(model(tensor),dim=1)[0].cpu().numpy()
-
-        stroke_prob = float(probs[1]); is_stroke = stroke_prob >= 0.5
-
-        with col_res:
-            if is_stroke:
-                st.markdown(f'<div class="risk-high"><strong>⚠️ STROKE DETECTED</strong><br>'
-                            f'Confidence: {stroke_prob*100:.1f}%<br>'
-                            f'Hemorrhagic stroke pattern identified. Immediate neurology referral required.</div>',
-                            unsafe_allow_html=True)
-            else:
-                st.markdown(f'<div class="risk-low"><strong>✅ NORMAL — No stroke detected</strong><br>'
-                            f'Normal probability: {probs[0]*100:.1f}%<br>'
-                            f'No hemorrhage pattern identified in this scan.</div>',
-                            unsafe_allow_html=True)
-
-            st.markdown("**Classification probabilities:**")
-            for label,p,color in [("Normal",probs[0],"#639922"),("Stroke",probs[1],"#E24B4A")]:
-                st.markdown(f'<div style="display:flex;align-items:center;gap:8px;margin:4px 0;font-size:13px">'
-                            f'<span style="min-width:58px">{label}</span>'
-                            f'<div style="flex:1;background:#e0e0e0;border-radius:4px;height:14px">'
-                            f'<div style="width:{p*100:.1f}%;background:{color};height:14px;border-radius:4px"></div>'
-                            f'</div><span>{p*100:.1f}%</span></div>', unsafe_allow_html=True)
-
-            st.markdown("**Model performance:**")
-            m1,m2 = st.columns(2)
-            m1.metric("AUROC","0.982"); m2.metric("Accuracy","92.2%")
-
-        # Clinical explanation + chatbot
-        result_label = "STROKE DETECTED" if is_stroke else "NORMAL — no stroke detected"
-        ps5_prompt = (
-            f"You are a clinical assistant helping a caregiver understand a brain CT scan result.\n\n"
-            f"AI CT scan result:\n"
-            f"- Result: {result_label}\n"
-            f"- Stroke probability: {stroke_prob*100:.1f}%\n"
-            f"- Normal probability: {probs[0]*100:.1f}%\n\n"
-            f"In 3-4 sentences explain: what this result means, "
-            f"{'what a hemorrhagic stroke is and why time is critical' if is_stroke else 'what the patient should monitor going forward'}, "
-            f"and what action is needed immediately. "
-            f"{'Emphasise urgency.' if is_stroke else 'Be reassuring but recommend neurology follow-up.'}"
-        )
-        ollama_ui(ps5_prompt, "ps5")
-
-        # Recommender
-        diag_key = "ps5_stroke" if is_stroke else "ps5_normal"
-        show_recommender(diag_key)
-    else:
-        st.info("Upload a brain CT scan image (.jpg or .png) to run stroke detection.")
-        col_a, col_b = st.columns(2)
-        with col_a:
-            st.markdown("**Classes:**\n- **Normal** — no hemorrhage detected\n- **Stroke** — hemorrhagic stroke pattern detected")
-        with col_b:
-            st.metric("AUROC","0.982"); st.metric("Stroke F1","0.89"); st.metric("Normal F1","0.94")
+    
+    render_ps5_page(model, ollama_ui, show_recommender, shimmer_metrics, shimmer_content)
 
 st.markdown('''
 <div class="app-footer">
